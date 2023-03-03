@@ -1,0 +1,9 @@
+name: SotaAndRadio
+version: '${project.version}'
+main: ru.yoricya.private.sota.sotaandradio.SotaAndRadio
+api-version: 1.19
+commands:
+  newSota:
+    description: Новая Станция
+    usage: /newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>
+    permission: sotaradio.newSota
