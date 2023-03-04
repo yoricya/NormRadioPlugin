@@ -45,5 +45,20 @@ public class Sota {
 
         return true;
     }
+    public int getMaxDist(){
+        float v = Wats * 15;
+        return Math.round(v);
+    }
 
+    public int getMidHei(int y){
+        int cy = 0;
+        if(y > Y){
+            int cyi = (y - Y) / 2;
+            cy = Y +cyi;
+        }else{
+            int cyi = (Y - y) / 2;
+            cy = y +cyi;
+        }
+        return Math.round(cy);
+    }
 }
