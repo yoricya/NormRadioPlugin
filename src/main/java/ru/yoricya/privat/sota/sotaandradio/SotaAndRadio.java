@@ -157,7 +157,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         }
                         event.getPlayer().sendMessage("2");
                         BossBar bossBar = Bukkit.createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
-                        double precforbs = Math.floorMod(prec, 100);
+                        double precforbs = prec / 100;
                         event.getPlayer().sendMessage("2-1: "+precforbs);
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
