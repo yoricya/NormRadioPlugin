@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
@@ -19,6 +20,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -31,7 +33,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     Logger log =Logger.getLogger("SotaAndRadio");
     public static JSONObject Sotas;
     public static Server Server;
-    public HashMap<Integer, BossBar> Bossbars = new HashMap<Integer, BossBar>();
+    public JSONObject Bossbars = new JSONObject();
     @Override
     public void onEnable() {
         try {
@@ -58,7 +60,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             Sota sot =  new Sota();
             sot.newSota(sender.getServer().getPlayer(sender.getName()) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
             Sotas.length();
-            Sotas.put(String.valueOf(Sotas.length()), sot);
+            Sotas.put(String.valueOf(Sotas.length()), sot.toString());
             sender.sendMessage("Сота создана!");
             return true;
         }
@@ -71,6 +73,12 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().sendMessage("Ты вошол на серв значит таймер готов!");
+        JSONObject bsbars = new JSONObject();
+        bsbars.put("GSM", 0);
+        bsbars.put("EDGE", 0);
+        bsbars.put("3G", 0);
+        bsbars.put("LTE", 0);
+
         final boolean[] a = {false};
         new Thread(new BukkitRunnable() {
             @Override
@@ -81,29 +89,35 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         file_put_contents("Sotas/Sotas.json", Sotas.toString());
                     }
                 }).start();
-                if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 200L); a[0] = true;
-                    System.out.println("124");
+                if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 40L); a[0] = true;
+                   // System.out.println("124");
+                    return;
                 }
                 if(!event.getPlayer().isOnline()){
                     this.cancel();
                     return;
                 }
+                try {
+                    for(int ib = 0; ib < Bossbars.length(); ib++) {
+                        event.getPlayer().sendMessage("Bossbar size:"+Bossbars.length());
+                        // System.out.println(Bossbars);
+                        try {
+                            BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
+                            bs.removeAll();
 
+                        }catch (Exception e){
+                            e.printStackTrace();
+                            //System.out.println("Skip:"+ ib);
+                        }
+                    }
+                    Bossbars.clear();
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
                 for(int i = 0; i < Sotas.length(); i++) {
                     event.getPlayer().sendMessage("Сота: "+i+", всего сот:"+Sotas.length());
                     try {
-                        try {
-                             for(int ib = 0; ib < Bossbars.size(); ib++) {
-                                 try {
-                                     BossBar bs = Bossbars.get(ib);
-                                     bs.removeAll();
-                                 }catch (Exception e){
-                                     System.out.println("Skip:"+ ib);
-                                 }
-                            }
-                        }catch (Exception e){
-                            e.printStackTrace();
-                        }
+
                         event.getPlayer().sendMessage("1");
                         Sota sota;
                         try {
@@ -114,11 +128,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         }
 
                         event.getPlayer().sendMessage("1-1");
-                        int prec = SotaSignalPrecent(event.getPlayer(), sota);
+                        double prec = SotaSignalPrecent(event.getPlayer(), sota);
                         event.getPlayer().sendMessage("1-2");
-                        if(prec == 0){
+                        if(prec <= 0){
                             event.getPlayer().sendMessage("1-3err: "+prec);
-                            return;
+                            continue;
                         }
                         event.getPlayer().sendMessage("1-4");
                         String st = sota.Type;
@@ -142,26 +156,48 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("EDGE")) {
                             st = "EDGE";
                             bc = BarColor.YELLOW;
+                            int e = bsbars.getInt("EDGE");
+                            if(e >= prec){
+                                continue;
+                            }
+                            bsbars.put("EDGE", prec);
                         }
                         if(st.equalsIgnoreCase("GSM")) {
                             st = "GSM";
                             bc = BarColor.RED;
+                            int e = bsbars.getInt("GSM");
+                            if(e >= prec){
+                                continue;
+                            }
+                            bsbars.put("GSM", prec);
                         }
                         if(st.equalsIgnoreCase("3G")) {
                             st = "3G";
                             bc = BarColor.GREEN;
+                            int e = bsbars.getInt("3G");
+                            if(e >= prec){
+                                continue;
+                            }
+                            bsbars.put("3G", prec);
                         }
                         if(st.equalsIgnoreCase("4G")) {
                             st = "LTE";
                             bc = BarColor.GREEN;
+                            int e = bsbars.getInt("LTE");
+                            if(e >= prec){
+                                continue;
+                            }
+                            bsbars.put("LTE", prec);
                         }
                         event.getPlayer().sendMessage("2");
                         BossBar bossBar = Bukkit.createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
-                        double precforbs = prec / 100;
+                        double precforbs = prec / 100.0;
+                        //precforbs += prec % 100.0;
                         event.getPlayer().sendMessage("2-1: "+precforbs);
+                        if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
-                        Bossbars.put(Bossbars.size() + 1,bossBar);
+                        Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
                         event.getPlayer().sendMessage("3: "+prec);
                     }catch (Exception e){
                         e.printStackTrace();
@@ -191,22 +227,25 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
         return Math.toIntExact(Math.round(distance));
     }
-    int SotaSignalPrecent(Player pl, Sota sota){
-        int precent = 0;
-        int nonprecent = 0;
-        int px = (int) pl.getLocation().getX();
-        int py = (int) pl.getLocation().getY();
-        int pz = (int) pl.getLocation().getZ();
+    double SotaSignalPrecent(Player pl, Sota sota){
+        int precent = 100;
+        //int nonprecent = 0;
+        //int px = (int) pl.getLocation().getX();
+        //int py = (int) pl.getLocation().getY();
+        //int pz = (int) pl.getLocation().getZ();
         int maxDist = sota.getMaxDist();
         int dist = distance(pl, sota);
         int res = maxDist - dist;
-        py = sota.getMidHei(py);
-        if(res <= 0){
-            pl.sendMessage("Precent"+res);
-            return 0;
-        }
+        //py = sota.getMidHei(py);
+       // if(res <= 0){
+          //pl.sendMessage("Res:"+res);
+        //    return 0;
+      //  }
+        precent -= (int) ((dist * 6) / sota.Wats);
+        /*
         int plrdi = getPlrDr(pl, sota);
-        pl.sendMessage("A1:"+precent);
+        pl.sendMessage("A1:"+py);
+
         if(plrdi == 1) {
             while (true) {
                 if (px == sota.X | py == sota.Y | pz == sota.Z) break;
@@ -309,19 +348,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
             }
         }
-        pl.sendMessage("A2: Nonprecent:"+nonprecent);
-        if(nonprecent != 100){
-            if(nonprecent == 0){
-                precent = 100;
-            }else {
-                while (nonprecent != 0) {
-                    precent = precent * 10 + nonprecent % 10;
-                    nonprecent = nonprecent / 10;
-                }
-            }
-        }else precent = 0;
-        pl.sendMessage("A3:"+precent);
-        return precent;
+         */
+        pl.sendMessage("A2:"+precent);
+        if(precent < 0) precent = 0;
+        return Double.parseDouble(precent+".0");
     }
     public int getPlrDr(Player player, Sota sota) {
 
