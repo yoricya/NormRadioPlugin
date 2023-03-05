@@ -4,6 +4,14 @@ main: ru.yoricya.privat.sota.sotaandradio.SotaAndRadio
 api-version: 1.19
 commands:
   newSota:
-    description: Новая Станция
+    description: Новая сота
     usage: /newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>
     permission: sotaradio.newSota
+  delSota:
+    description: Удалить соту
+    usage: /delSota <ID>
+    permission: sotaradio.delSota
+  nearSota:
+    description: Соты поблизости
+    usage: /nearSota
+    permission: sotaradio.nearSota

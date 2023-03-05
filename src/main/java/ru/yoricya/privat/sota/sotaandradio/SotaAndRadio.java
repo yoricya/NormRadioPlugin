@@ -59,9 +59,37 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
             Sota sot =  new Sota();
             sot.newSota(sender.getServer().getPlayer(sender.getName()) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
-            Sotas.length();
+            sot.id = Sotas.length();
             Sotas.put(String.valueOf(Sotas.length()), sot.toString());
-            sender.sendMessage("Сота создана!");
+            sender.sendMessage("Сота создана! ID cоты:"+sot.id);
+            return true;
+        }
+        if(command.getName().equals("delSota")){
+            if(args.length < 1){
+                sender.sendMessage("Не все арги указаны!");
+                return false;
+            }
+            Sota sot = new Sota(Sotas.getString(args[0]));
+            sot.Description = "OFF";
+            Sotas.put(String.valueOf(args[0]), sot.toString());
+            sender.sendMessage("Сота удалена!");
+            return true;
+        }
+        if(command.getName().equals("nearSota")){
+            Sota sot = new Sota();
+            int dist = 1000;
+            for(int i = 0; i < Sotas.length(); i++) {
+                    Sota sotv = new Sota(Sotas.getString(String.valueOf(i)));
+                    if(sotv.Description.equals("OFF")){
+                        continue;
+                    }
+                    int g = distance(sender.getServer().getPlayer(sender.getName()), sotv);
+                    if (g <= dist) {
+                        dist = g;
+                        sot = sotv;
+                    }
+            }
+            sender.sendMessage("Ближайшая к вам сота, ID: "+sot.id+" - Имя: "+sot.Name+" - Тип: "+sot.Type);
             return true;
         }
         return false;
@@ -73,11 +101,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().sendMessage("Ты вошол на серв значит таймер готов!");
-        JSONObject bsbars = new JSONObject();
-        bsbars.put("GSM", 0);
-        bsbars.put("EDGE", 0);
-        bsbars.put("3G", 0);
-        bsbars.put("LTE", 0);
+      //  JSONObject bsbars = new JSONObject();
+        //bsbars.put("GSM", 0);
+        //bsbars.put("EDGE", 0);
+        //bsbars.put("3G", 0);
+        //bsbars.put("LTE", 0);
 
         final boolean[] a = {false};
         new Thread(new BukkitRunnable() {
@@ -89,7 +117,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         file_put_contents("Sotas/Sotas.json", Sotas.toString());
                     }
                 }).start();
-                if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 40L); a[0] = true;
+                if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 10L); a[0] = true;
                    // System.out.println("124");
                     return;
                 }
@@ -99,12 +127,15 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
                 try {
                     for(int ib = 0; ib < Bossbars.length(); ib++) {
-                        event.getPlayer().sendMessage("Bossbar size:"+Bossbars.length());
+                       // event.getPlayer().sendMessage("Bossbar size:"+Bossbars.length());
                         // System.out.println(Bossbars);
                         try {
                             BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
                             bs.removeAll();
-
+                           // bsbars.put("GSM", 0);
+                            //bsbars.put("EDGE", 0);
+                            //bsbars.put("3G", 0);
+                           // bsbars.put("LTE", 0);
                         }catch (Exception e){
                             e.printStackTrace();
                             //System.out.println("Skip:"+ ib);
@@ -115,26 +146,29 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     e.printStackTrace();
                 }
                 for(int i = 0; i < Sotas.length(); i++) {
-                    event.getPlayer().sendMessage("Сота: "+i+", всего сот:"+Sotas.length());
+                    //event.getPlayer().sendMessage("Сота: "+i+", всего сот:"+Sotas.length());
                     try {
 
-                        event.getPlayer().sendMessage("1");
+                       // event.getPlayer().sendMessage("1");
                         Sota sota;
                         try {
                             sota = new Sota(Sotas.getString(String.valueOf(i)));
+                            if(sota.Description.equals("OFF")){
+                                continue;
+                            }
                         }catch (Exception e){
-                            e.printStackTrace();
-                            return;
-                        }
-
-                        event.getPlayer().sendMessage("1-1");
-                        double prec = SotaSignalPrecent(event.getPlayer(), sota);
-                        event.getPlayer().sendMessage("1-2");
-                        if(prec <= 0){
-                            event.getPlayer().sendMessage("1-3err: "+prec);
+                           // e.printStackTrace();
                             continue;
                         }
-                        event.getPlayer().sendMessage("1-4");
+
+                       // event.getPlayer().sendMessage("1-1");
+                        double prec = SotaSignalPrecent(event.getPlayer(), sota);
+                      //  event.getPlayer().sendMessage("1-2");
+                        if(prec <= 0){
+                          //  event.getPlayer().sendMessage("1-3err: "+prec);
+                            continue;
+                        }
+                       // event.getPlayer().sendMessage("1-4");
                         String st = sota.Type;
                         BarColor bc = BarColor.BLUE;
                         if(st.equalsIgnoreCase("wifi")) {
@@ -156,54 +190,54 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("EDGE")) {
                             st = "EDGE";
                             bc = BarColor.YELLOW;
-                            int e = bsbars.getInt("EDGE");
-                            if(e >= prec){
-                                continue;
-                            }
-                            bsbars.put("EDGE", prec);
+                          //  int e = bsbars.getInt("EDGE");
+                           // if(e > prec){
+                            //    continue;
+                            //}
+                            //bsbars.put("EDGE", prec);
                         }
                         if(st.equalsIgnoreCase("GSM")) {
                             st = "GSM";
                             bc = BarColor.RED;
-                            int e = bsbars.getInt("GSM");
-                            if(e >= prec){
-                                continue;
-                            }
-                            bsbars.put("GSM", prec);
+                           // int e = bsbars.getInt("GSM");
+                            //if(e > prec){
+                              //  continue;
+                           // }
+                         //   bsbars.put("GSM", prec);
                         }
                         if(st.equalsIgnoreCase("3G")) {
                             st = "3G";
                             bc = BarColor.GREEN;
-                            int e = bsbars.getInt("3G");
-                            if(e >= prec){
-                                continue;
-                            }
-                            bsbars.put("3G", prec);
+                          //  int e = bsbars.getInt("3G");
+                            //if(e > prec){
+                              //  continue;
+                           // }
+                           // bsbars.put("3G", prec);
                         }
                         if(st.equalsIgnoreCase("4G")) {
                             st = "LTE";
                             bc = BarColor.GREEN;
-                            int e = bsbars.getInt("LTE");
-                            if(e >= prec){
-                                continue;
-                            }
-                            bsbars.put("LTE", prec);
+                           // int e = bsbars.getInt("LTE");
+                            //if(e > prec){
+                             //   continue;
+                            //}
+                            //bsbars.put("LTE", prec);
                         }
-                        event.getPlayer().sendMessage("2");
+                        //event.getPlayer().sendMessage("2");
                         BossBar bossBar = Bukkit.createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
                         double precforbs = prec / 100.0;
                         //precforbs += prec % 100.0;
-                        event.getPlayer().sendMessage("2-1: "+precforbs);
+                       // event.getPlayer().sendMessage("2-1: "+precforbs);
                         if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
                         Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
-                        event.getPlayer().sendMessage("3: "+prec);
+                       // event.getPlayer().sendMessage("3: "+prec);
                     }catch (Exception e){
-                        e.printStackTrace();
+                        //e.printStackTrace();
                     }
                 }
-                event.getPlayer().sendMessage("Таймер");
+              //  event.getPlayer().sendMessage("Таймер");
             }
         }).start();
 
@@ -349,7 +383,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
         }
          */
-        pl.sendMessage("A2:"+precent);
+      //  pl.sendMessage("A2:"+precent);
         if(precent < 0) precent = 0;
         return Double.parseDouble(precent+".0");
     }

@@ -10,6 +10,7 @@ public class Sota {
     public String Type;
     public Float Wats;
     public String Description;
+    public int id;
     public int X;
     public int Y;
     public int Z;
@@ -29,9 +30,10 @@ public class Sota {
         X = Integer.parseInt(sot[4]);
         Y = Integer.parseInt(sot[5]);
         Z = Integer.parseInt(sot[6]);
+        id = Integer.parseInt(sot[7]);
     }
     public String toString() {
-        return Name+"_"+Type+"_"+Wats+"_"+Description+"_"+X+"_"+Y+"_"+Z;
+        return Name+"_"+Type+"_"+Wats+"_"+Description+"_"+X+"_"+Y+"_"+Z+"_"+id;
     }
 
     public boolean newSota(Player pl, String name, String type, Float wats, String desc) {
