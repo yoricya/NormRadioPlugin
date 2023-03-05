@@ -92,6 +92,58 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             sender.sendMessage("Ближайшая к вам сота, ID: "+sot.id+" - Имя: "+sot.Name+" - Тип: "+sot.Type);
             return true;
         }
+        if(command.getName().equals("userParamSota")){
+            if(args.length < 2){
+            sender.sendMessage("OperatorTest <1/0> (Проверять ли соты на соответствие оператора)" +
+                    "\nOperator <Имя> (Установить оператора)" +
+                    "\nRadio <1/0> (Выключить отображение радиостанций)" +
+                    "\nTV <1/0> (Включить отображение TV)" +
+                    "\nWIFI <1/0> (Выключить отображение WIFI)" +
+                    "\nMOBILE <1/0> (Выключить отображение Мобильных Сетей)");
+            return true;
+            }
+            JSONObject plrSets = new JSONObject();
+            if(!if_file_exs("Sotas/"+sender.getName()+".json")){
+                plrSets.put("operator", "none");
+                plrSets.put("offmob", false);
+                plrSets.put("optest", false);
+                plrSets.put("offtv", false);
+                plrSets.put("offradio", false);
+                plrSets.put("offwifi", false);
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+            }else{
+                try {
+                    plrSets = new JSONObject(file_get_contents("Sotas/"+sender.getName()+".json"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if(args[0].equalsIgnoreCase("OperatorTest")){
+                plrSets.put("optest", args[1].equalsIgnoreCase("1"));
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else if(args[0].equalsIgnoreCase("Radio")){
+                plrSets.put("offradio", args[1].equalsIgnoreCase("1"));
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else if(args[0].equalsIgnoreCase("TV")){
+                plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else if(args[0].equalsIgnoreCase("WIFI")){
+                plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else if(args[0].equalsIgnoreCase("MOBILE")){
+                plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else if(args[0].equalsIgnoreCase("Operator")){
+                plrSets.put("operator", args[1]);
+                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
+                return true;
+            }else return false;
+        }
         return false;
     }
     public static Material getBlockType(int x, int y, int z){
@@ -125,7 +177,19 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     this.cancel();
                     return;
                 }
+                JSONObject plrSets = new JSONObject();
                 try {
+                    if(!if_file_exs("Sotas/"+event.getPlayer().getName()+".json")){
+                        plrSets.put("operator", "none");
+                        plrSets.put("offmob", false);
+                        plrSets.put("optest", false);
+                        plrSets.put("offtv", false);
+                        plrSets.put("offradio", false);
+                        plrSets.put("offwifi", false);
+                        file_put_contents("Sotas/"+event.getPlayer().getName()+".json", plrSets.toString());
+                    }else{
+                        plrSets = new JSONObject(file_get_contents("Sotas/"+event.getPlayer().getName()+".json"));
+                    }
                     for(int ib = 0; ib < Bossbars.length(); ib++) {
                        // event.getPlayer().sendMessage("Bossbar size:"+Bossbars.length());
                         // System.out.println(Bossbars);
@@ -174,54 +238,74 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("wifi")) {
                             st = "WiFi";
                             bc = BarColor.WHITE;
-                        }
+                        }else
                         if(st.equalsIgnoreCase("wifi5")) {
                             st = "WiFi-5G";
                             bc = BarColor.WHITE;
-                        }
+                        }else
                         if(st.equalsIgnoreCase("wifi6")) {
                             st = "WiFi-6";
                             bc = BarColor.WHITE;
-                        }
+                        }else
                         if(st.equalsIgnoreCase("wifi7")) {
                             st = "WiFi-7";
                             bc = BarColor.WHITE;
-                        }
+                        }else
                         if(st.equalsIgnoreCase("EDGE")) {
                             st = "EDGE";
                             bc = BarColor.YELLOW;
+                            if(plrSets.getBoolean("offmob")) continue;
+                            if(plrSets.getBoolean("optest"))
+                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
                           //  int e = bsbars.getInt("EDGE");
                            // if(e > prec){
                             //    continue;
                             //}
                             //bsbars.put("EDGE", prec);
-                        }
+                        }else
                         if(st.equalsIgnoreCase("GSM")) {
                             st = "GSM";
                             bc = BarColor.RED;
+                            if(plrSets.getBoolean("offmob")) continue;
+                            if(plrSets.getBoolean("optest"))
+                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
                            // int e = bsbars.getInt("GSM");
                             //if(e > prec){
                               //  continue;
                            // }
                          //   bsbars.put("GSM", prec);
-                        }
+                        }else
                         if(st.equalsIgnoreCase("3G")) {
                             st = "3G";
                             bc = BarColor.GREEN;
+                            if(plrSets.getBoolean("offmob")) continue;
+                            if(plrSets.getBoolean("optest"))
+                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
                           //  int e = bsbars.getInt("3G");
                             //if(e > prec){
                               //  continue;
                            // }
                            // bsbars.put("3G", prec);
-                        }
+                        }else
                         if(st.equalsIgnoreCase("4G")) {
                             st = "LTE";
                             bc = BarColor.GREEN;
+                            if(plrSets.getBoolean("offmob")) continue;
+                            if(plrSets.getBoolean("optest"))
+                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
+
                            // int e = bsbars.getInt("LTE");
                             //if(e > prec){
                              //   continue;
                             //}
                             //bsbars.put("LTE", prec);
+                        }else if(sota.Description.equalsIgnoreCase("TV")){
+                            st = "TV";
+                            bc = BarColor.BLUE;
+                            if(plrSets.getBoolean("offtv")) continue;
+                        }
+                        else{
+                            if(plrSets.getBoolean("offradio")) continue;
                         }
                         //event.getPlayer().sendMessage("2");
                         BossBar bossBar = Bukkit.createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
