@@ -33,7 +33,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     Logger log =Logger.getLogger("SotaAndRadio");
     public static JSONObject Sotas;
     public static Server Server;
-    public JSONObject Bossbars = new JSONObject();
+
     @Override
     public void onEnable() {
         try {
@@ -163,6 +163,8 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         new Thread(new BukkitRunnable() {
             @Override
             public void run() {
+                JSONObject Bossbars = new JSONObject();
+                JSONObject BossbarsNet = new JSONObject();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -209,6 +211,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }catch (Exception e){
                     e.printStackTrace();
                 }
+                int netp = 0;
                 for(int i = 0; i < Sotas.length(); i++) {
                     //event.getPlayer().sendMessage("Сота: "+i+", всего сот:"+Sotas.length());
                     try {
@@ -233,6 +236,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             continue;
                         }
                        // event.getPlayer().sendMessage("1-4");
+                        boolean isNet = false;
                         String st = sota.Type;
                         BarColor bc = BarColor.BLUE;
                         if(st.equalsIgnoreCase("wifi")) {
@@ -254,9 +258,22 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("EDGE")) {
                             st = "EDGE";
                             bc = BarColor.YELLOW;
+                            isNet = true;
                             if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest"))
+                            if(plrSets.getBoolean("optest")) {
                                 if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(netp>1) continue;
+                                netp = 2;
+                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
+                                    try {
+                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
+                                        bs.removeAll();
+                                    }catch (Exception e){
+                                        e.printStackTrace();
+                                    }
+                                }
+                                BossbarsNet.clear();
+                            }
                           //  int e = bsbars.getInt("EDGE");
                            // if(e > prec){
                             //    continue;
@@ -266,9 +283,22 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("GSM")) {
                             st = "GSM";
                             bc = BarColor.RED;
+                            isNet = true;
                             if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest"))
+                            if(plrSets.getBoolean("optest")) {
                                 if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(netp>0) continue;
+                                netp = 1;
+                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
+                                    try {
+                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
+                                        bs.removeAll();
+                                    }catch (Exception e){
+                                        e.printStackTrace();
+                                    }
+                                }
+                                BossbarsNet.clear();
+                            }
                            // int e = bsbars.getInt("GSM");
                             //if(e > prec){
                               //  continue;
@@ -278,22 +308,42 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(st.equalsIgnoreCase("3G")) {
                             st = "3G";
                             bc = BarColor.GREEN;
+                            isNet = true;
                             if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest"))
+                            if(plrSets.getBoolean("optest")) {
                                 if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-                          //  int e = bsbars.getInt("3G");
-                            //if(e > prec){
-                              //  continue;
-                           // }
-                           // bsbars.put("3G", prec);
+                                if(netp>2) continue;
+                                netp = 3;
+                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
+                                    try {
+                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
+                                        bs.removeAll();
+                                    }catch (Exception e){
+                                        e.printStackTrace();
+                                    }
+                                }
+                                BossbarsNet.clear();
+                            }
                         }else
                         if(st.equalsIgnoreCase("4G")) {
                             st = "LTE";
                             bc = BarColor.GREEN;
+                            isNet = true;
                             if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest"))
+                            if(plrSets.getBoolean("optest")) {
                                 if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-
+                                if(netp>3) continue;
+                                netp =4;
+                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
+                                    try {
+                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
+                                        bs.removeAll();
+                                    }catch (Exception e){
+                                        e.printStackTrace();
+                                    }
+                                }
+                                BossbarsNet.clear();
+                            }
                            // int e = bsbars.getInt("LTE");
                             //if(e > prec){
                              //   continue;
@@ -315,7 +365,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
-                        Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
+                        if(isNet){
+                            BossbarsNet.put(String.valueOf(Bossbars.length()),bossBar);
+                        }else{ Bossbars.put(String.valueOf(Bossbars.length()),bossBar); }
                        // event.getPlayer().sendMessage("3: "+prec);
                     }catch (Exception e){
                         //e.printStackTrace();
