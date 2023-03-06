@@ -1,17 +1,9 @@
 package ru.yoricya.privat.sota.sotaandradio;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Server;
-import org.bukkit.block.Block;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarFlag;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
+import org.bukkit.*;
+import org.bukkit.boss.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Boss;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -20,20 +12,19 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Iterator;
 import java.util.logging.Logger;
 
-import static ru.yoricya.zslogin.srv.php.*;
+import static ru.yoricya.privat.sota.sotaandradio.php.*;
 
 public final class SotaAndRadio extends JavaPlugin implements Listener {
     Logger log =Logger.getLogger("SotaAndRadio");
     public static JSONObject Sotas;
+    public JSONObject allBossbars = new JSONObject();
     public static Server Server;
-
     @Override
     public void onEnable() {
         try {
@@ -43,37 +34,61 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // Plugin startup logic
+
+
+        if(getServer().getOnlinePlayers().size() > 0){
+            for (Player player : getServer().getOnlinePlayers()){
+                onPlayerJoin(new PlayerJoinEvent(player, null));
+            }
+        }
     }
 
     @Override
     public void onDisable() {
-
+        for(int ib = 0; ib < allBossbars.length(); ib++) {
+            try {
+                BossBar bs = (BossBar) allBossbars.get(String.valueOf(ib));
+                bs.removeAll();
+            }catch (Exception e){
+                //e.printStackTrace();
+            }
+        }
+        allBossbars.clear();
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        final boolean[] tru = {false};
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+        try{
+
         if(command.getName().equals("newSota")){
             if(args.length < 4){
                 sender.sendMessage("Не все арги указаны!");
-                return false;
+                tru[0] = false;
+                return;
             }
             Sota sot =  new Sota();
             sot.newSota(sender.getServer().getPlayer(sender.getName()) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
             sot.id = Sotas.length();
             Sotas.put(String.valueOf(Sotas.length()), sot.toString());
             sender.sendMessage("Сота создана! ID cоты:"+sot.id);
-            return true;
+            tru[0] = true;
+                return;
         }
         if(command.getName().equals("delSota")){
             if(args.length < 1){
                 sender.sendMessage("Не все арги указаны!");
-                return false;
+                tru[0] = false;
+                return;
             }
             Sota sot = new Sota(Sotas.getString(args[0]));
             sot.Description = "OFF";
             Sotas.put(String.valueOf(args[0]), sot.toString());
             sender.sendMessage("Сота удалена!");
-            return true;
+            tru[0] = true;
+                return;
         }
         if(command.getName().equals("nearSota")){
             Sota sot = new Sota();
@@ -90,61 +105,77 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
             }
             sender.sendMessage("Ближайшая к вам сота, ID: "+sot.id+" - Имя: "+sot.Name+" - Тип: "+sot.Type);
-            return true;
+            tru[0] = true;
+                return;
         }
-        if(command.getName().equals("userParamSota")){
-            if(args.length < 2){
-            sender.sendMessage("OperatorTest <1/0> (Проверять ли соты на соответствие оператора)" +
-                    "\nOperator <Имя> (Установить оператора)" +
-                    "\nRadio <1/0> (Выключить отображение радиостанций)" +
-                    "\nTV <1/0> (Включить отображение TV)" +
-                    "\nWIFI <1/0> (Выключить отображение WIFI)" +
-                    "\nMOBILE <1/0> (Выключить отображение Мобильных Сетей)");
-            return true;
+
+
+        if(command.getName().equals("userParamSota")) {
+            if (args.length < 2) {
+                sender.sendMessage("OperatorTest <1/0> (Проверять ли соты на соответствие оператора)" +
+                        "\nOperator <Имя> (Установить оператора)" +
+                        "\nRadio <1/0> (Включить отображение радиостанций)" +
+                        "\nTV <1/0> (Включить отображение TV)" +
+                        "\nWIFI <1/0> (Включить отображение WIFI)" +
+                        "\nMOBILE <1/0> (Включить отображение Мобильных Сетей)");
+                tru[0] = true;
+                return;
             }
             JSONObject plrSets = new JSONObject();
-            if(!if_file_exs("Sotas/"+sender.getName()+".json")){
+            if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
                 plrSets.put("operator", "none");
                 plrSets.put("offmob", false);
                 plrSets.put("optest", false);
                 plrSets.put("offtv", false);
                 plrSets.put("offradio", false);
                 plrSets.put("offwifi", false);
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-            }else{
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+            } else {
                 try {
-                    plrSets = new JSONObject(file_get_contents("Sotas/"+sender.getName()+".json"));
+                    plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
-            if(args[0].equalsIgnoreCase("OperatorTest")){
+            if (args[0].equalsIgnoreCase("OperatorTest")) {
                 plrSets.put("optest", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else if(args[0].equalsIgnoreCase("Radio")){
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else if (args[0].equalsIgnoreCase("Radio")) {
                 plrSets.put("offradio", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else if(args[0].equalsIgnoreCase("TV")){
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else if (args[0].equalsIgnoreCase("TV")) {
                 plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else if(args[0].equalsIgnoreCase("WIFI")){
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else if (args[0].equalsIgnoreCase("WIFI")) {
                 plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else if(args[0].equalsIgnoreCase("MOBILE")){
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else if (args[0].equalsIgnoreCase("MOBILE")) {
                 plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else if(args[0].equalsIgnoreCase("Operator")){
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else if (args[0].equalsIgnoreCase("Operator")) {
                 plrSets.put("operator", args[1]);
-                file_put_contents("Sotas/"+sender.getName()+".json", plrSets.toString());
-                return true;
-            }else return false;
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                tru[0] = true;
+                return;
+            } else {tru[0] = false;}
         }
-        return false;
+        }catch (Exception e){
+            tru[0] =false;
+        }
+            }
+        }).start();
+        sender.sendMessage(String.valueOf(tru[0]));
+        return tru[0];
     }
     public static Material getBlockType(int x, int y, int z){
         return Server.getWorld("World").getBlockAt(x, y, z).getType();
@@ -152,71 +183,61 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        event.getPlayer().sendMessage("Ты вошол на серв значит таймер готов!");
-      //  JSONObject bsbars = new JSONObject();
-        //bsbars.put("GSM", 0);
-        //bsbars.put("EDGE", 0);
-        //bsbars.put("3G", 0);
-        //bsbars.put("LTE", 0);
-
+        final JSONObject[] plrSets = {new JSONObject()};
+        JSONObject Bossbars = new JSONObject();
+        final int[] ak = {1};
         final boolean[] a = {false};
         new Thread(new BukkitRunnable() {
             @Override
             public void run() {
-                JSONObject Bossbars = new JSONObject();
-                JSONObject BossbarsNet = new JSONObject();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         file_put_contents("Sotas/Sotas.json", Sotas.toString());
+
+                        try {
+                            if(!if_file_exs("Sotas/"+event.getPlayer().getName()+".json")){
+                                plrSets[0].put("operator", "none");
+                                plrSets[0].put("offmob", false);
+                                plrSets[0].put("optest", true);
+                                plrSets[0].put("offtv", false);
+                                plrSets[0].put("offradio", false);
+                                plrSets[0].put("offwifi", false);
+                                file_put_contents("Sotas/"+event.getPlayer().getName()+".json", plrSets[0].toString());
+                            }else{
+
+                                plrSets[0] = new JSONObject(file_get_contents("Sotas/"+event.getPlayer().getName()+".json"));
+
+                            }
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
                     }
                 }).start();
+
                 if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 10L); a[0] = true;
-                   // System.out.println("124");
                     return;
                 }
+
                 if(!event.getPlayer().isOnline()){
                     this.cancel();
                     return;
                 }
-                JSONObject plrSets = new JSONObject();
-                try {
-                    if(!if_file_exs("Sotas/"+event.getPlayer().getName()+".json")){
-                        plrSets.put("operator", "none");
-                        plrSets.put("offmob", false);
-                        plrSets.put("optest", false);
-                        plrSets.put("offtv", false);
-                        plrSets.put("offradio", false);
-                        plrSets.put("offwifi", false);
-                        file_put_contents("Sotas/"+event.getPlayer().getName()+".json", plrSets.toString());
-                    }else{
-                        plrSets = new JSONObject(file_get_contents("Sotas/"+event.getPlayer().getName()+".json"));
-                    }
-                    for(int ib = 0; ib < Bossbars.length(); ib++) {
-                       // event.getPlayer().sendMessage("Bossbar size:"+Bossbars.length());
-                        // System.out.println(Bossbars);
-                        try {
-                            BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
-                            bs.removeAll();
-                           // bsbars.put("GSM", 0);
-                            //bsbars.put("EDGE", 0);
-                            //bsbars.put("3G", 0);
-                           // bsbars.put("LTE", 0);
-                        }catch (Exception e){
-                            e.printStackTrace();
-                            //System.out.println("Skip:"+ ib);
-                        }
-                    }
-                    Bossbars.clear();
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-                int netp = 0;
-                for(int i = 0; i < Sotas.length(); i++) {
-                    //event.getPlayer().sendMessage("Сота: "+i+", всего сот:"+Sotas.length());
+                for(int ib = 0; ib < Bossbars.length(); ib++) {
                     try {
-
-                       // event.getPlayer().sendMessage("1");
+                        BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
+                        bs.removeAll();
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+                Bossbars.clear();
+                int net = 0;
+                double[] netprec = new double[4];
+                BossBar bsnet = null;
+                if(plrSets[0].getBoolean("optest"))  bsnet = getServer().createBossBar("n", BarColor.BLUE, BarStyle.SOLID, BarFlag.DARKEN_SKY);
+                for(int i = 0; i < Sotas.length(); i++) {
+                    try {
                         Sota sota;
                         try {
                             sota = new Sota(Sotas.getString(String.valueOf(i)));
@@ -227,16 +248,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                            // e.printStackTrace();
                             continue;
                         }
-
-                       // event.getPlayer().sendMessage("1-1");
                         double prec = SotaSignalPrecent(event.getPlayer(), sota);
-                      //  event.getPlayer().sendMessage("1-2");
                         if(prec <= 0){
-                          //  event.getPlayer().sendMessage("1-3err: "+prec);
                             continue;
                         }
-                       // event.getPlayer().sendMessage("1-4");
-                        boolean isNet = false;
                         String st = sota.Type;
                         BarColor bc = BarColor.BLUE;
                         if(st.equalsIgnoreCase("wifi")) {
@@ -255,124 +270,126 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             st = "WiFi-7";
                             bc = BarColor.WHITE;
                         }else
-                        if(st.equalsIgnoreCase("EDGE")) {
-                            st = "EDGE";
-                            bc = BarColor.YELLOW;
-                            isNet = true;
-                            if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest")) {
-                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-                                if(netp>1) continue;
-                                netp = 2;
-                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
-                                    try {
-                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
-                                        bs.removeAll();
-                                    }catch (Exception e){
-                                        e.printStackTrace();
-                                    }
-                                }
-                                BossbarsNet.clear();
-                            }
-                          //  int e = bsbars.getInt("EDGE");
-                           // if(e > prec){
-                            //    continue;
-                            //}
-                            //bsbars.put("EDGE", prec);
-                        }else
                         if(st.equalsIgnoreCase("GSM")) {
                             st = "GSM";
                             bc = BarColor.RED;
-                            isNet = true;
-                            if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest")) {
-                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-                                if(netp>0) continue;
-                                netp = 1;
-                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
-                                    try {
-                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
-                                        bs.removeAll();
-                                    }catch (Exception e){
-                                        e.printStackTrace();
-                                    }
-                                }
-                                BossbarsNet.clear();
+                            if(plrSets[0].getBoolean("offmob")) continue;
+                            if(plrSets[0].getBoolean("optest")) {
+                                if (!plrSets[0].getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(net > 1) continue;
+                                bsnet.setColor(bc);
+                                bsnet.setTitle(sota.Name+" ("+st+")");
+                                double precforbs = prec / 100.0;
+                                if(precforbs > 1.0) precforbs /= 100.0;
+                                //bsnet.setProgress(precforbs);
+                                netprec[0] += precforbs;
+                                net = 1;
+                                continue;
                             }
-                           // int e = bsbars.getInt("GSM");
-                            //if(e > prec){
-                              //  continue;
-                           // }
-                         //   bsbars.put("GSM", prec);
+                        }else
+                        if(st.equalsIgnoreCase("EDGE")) {
+                            st = "EDGE";
+                            bc = BarColor.YELLOW;
+                            if(plrSets[0].getBoolean("offmob")) continue;
+                            if(plrSets[0].getBoolean("optest")) {
+                                if (!plrSets[0].getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(net > 2) continue;
+                                bsnet.setColor(bc);
+                                bsnet.setTitle(sota.Name+" ("+st+")");
+                                double precforbs = prec / 100.0;
+                                if(precforbs > 1.0) precforbs /= 100.0;
+                                //bsnet.setProgress(precforbs);
+                                netprec[1] += precforbs;
+                                net = 2;
+                                continue;
+                            }
                         }else
                         if(st.equalsIgnoreCase("3G")) {
                             st = "3G";
                             bc = BarColor.GREEN;
-                            isNet = true;
-                            if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest")) {
-                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-                                if(netp>2) continue;
-                                netp = 3;
-                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
-                                    try {
-                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
-                                        bs.removeAll();
-                                    }catch (Exception e){
-                                        e.printStackTrace();
-                                    }
-                                }
-                                BossbarsNet.clear();
+                            if(plrSets[0].getBoolean("offmob")) continue;
+                            if(plrSets[0].getBoolean("optest")) {
+                                if (!plrSets[0].getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(net > 3) continue;
+                                bsnet.setColor(bc);
+                                bsnet.setTitle(sota.Name+" ("+st+")");
+                                double precforbs = prec / 100.0;
+                                if(precforbs > 1.0) precforbs /= 100.0;
+                                //bsnet.setProgress(precforbs);
+                                netprec[2] += precforbs;
+                                net = 3;
+                                continue;
                             }
                         }else
                         if(st.equalsIgnoreCase("4G")) {
                             st = "LTE";
                             bc = BarColor.GREEN;
-                            isNet = true;
-                            if(plrSets.getBoolean("offmob")) continue;
-                            if(plrSets.getBoolean("optest")) {
-                                if (!plrSets.getString("operator").equalsIgnoreCase(sota.Name)) continue;
-                                if(netp>3) continue;
-                                netp =4;
-                                for(int ib = 0; ib < BossbarsNet.length(); ib++) {
-                                    try {
-                                        BossBar bs = (BossBar) BossbarsNet.get(String.valueOf(ib));
-                                        bs.removeAll();
-                                    }catch (Exception e){
-                                        e.printStackTrace();
-                                    }
-                                }
-                                BossbarsNet.clear();
+                            if(plrSets[0].getBoolean("offmob")) continue;
+                            if(plrSets[0].getBoolean("optest")) {
+                                if (!plrSets[0].getString("operator").equalsIgnoreCase(sota.Name)) continue;
+                                if(net > 4) continue;
+                                bsnet.setColor(bc);
+                                bsnet.setTitle(sota.Name+" ("+st+")");
+                                double precforbs = prec / 100.0;
+                                if(precforbs > 1.0) precforbs /= 100.0;
+                                //bsnet.setProgress(precforbs);
+                                netprec[3] += precforbs;
+                                net = 4;
+                                continue;
                             }
-                           // int e = bsbars.getInt("LTE");
-                            //if(e > prec){
-                             //   continue;
-                            //}
-                            //bsbars.put("LTE", prec);
                         }else if(sota.Description.equalsIgnoreCase("TV")){
                             st = "TV";
                             bc = BarColor.BLUE;
-                            if(plrSets.getBoolean("offtv")) continue;
+                            if(plrSets[0].getBoolean("offtv")) continue;
                         }
                         else{
-                            if(plrSets.getBoolean("offradio")) continue;
+                            if(plrSets[0].getBoolean("offradio")) continue;
                         }
-                        //event.getPlayer().sendMessage("2");
-                        BossBar bossBar = Bukkit.createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
+                        BossBar bossBar = getServer().createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
                         double precforbs = prec / 100.0;
-                        //precforbs += prec % 100.0;
-                       // event.getPlayer().sendMessage("2-1: "+precforbs);
                         if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
-                        if(isNet){
-                            BossbarsNet.put(String.valueOf(Bossbars.length()),bossBar);
-                        }else{ Bossbars.put(String.valueOf(Bossbars.length()),bossBar); }
-                       // event.getPlayer().sendMessage("3: "+prec);
+                        allBossbars.put(String.valueOf(Bossbars.length()), bsnet);
+                        Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
                     }catch (Exception e){
-                        //e.printStackTrace();
+                        e.printStackTrace();
                     }
                 }
+                        if(bsnet != null) {
+                            if (bsnet.getTitle().equalsIgnoreCase("n")) return;
+                            if(netprec[net - 1] > 1.0) netprec[net - 1] = 1.0;
+                            bsnet.setProgress(netprec[net - 1]);
+                            //double precg = 0;
+                           // for(int i = 0; i != 4; i++) {
+                            //    if(netprec[i] < precg) precg = netprec[i];
+                            //}
+                            bsnet.addPlayer(event.getPlayer());
+                            Bossbars.put(String.valueOf(Bossbars.length()), bsnet);
+                            allBossbars.put(String.valueOf(Bossbars.length()), bsnet);
+                        }
+
+                BukkitRunnable b = this;
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if(ak[0] >= 20){
+                            b.cancel();
+                            for(int ib = 0; ib < Bossbars.length(); ib++) {
+                                try {
+                                    BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
+                                    bs.removeAll();
+                                }catch (Exception e){
+                                    e.printStackTrace();
+                                }
+                            }
+                            allBossbars.clear();
+                            if(event.getPlayer().isOnline()) onPlayerJoin(event);
+                            return;
+                        }
+                        ak[0] +=1;
+                    }
+                }).start();
               //  event.getPlayer().sendMessage("Таймер");
             }
         }).start();

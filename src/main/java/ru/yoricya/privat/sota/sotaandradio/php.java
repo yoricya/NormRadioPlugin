@@ -1,4 +1,4 @@
-package ru.yoricya.zslogin.srv;
+package ru.yoricya.privat.sota.sotaandradio;
 
 import org.json.JSONObject;
 
@@ -45,37 +45,23 @@ public class php {
         return builder.toString();
     }
     public static boolean if_file_exs(String filename) {
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(filename));
-            StringBuilder builder = new StringBuilder();
-            String line;
-
-            // For every line in the file, append it to the string builder
-            while ((line = reader.readLine()) != null) {
-                if (line.equalsIgnoreCase("\n")) {
-                    builder.append("\n");
-                } else if (line.equalsIgnoreCase("")) {
-                    builder.append("\n");
-                } else {
-                    builder.append(line);
-                }
-            }
-
-            reader.close();
-            return  true;
-        }catch (Exception e){
-            return  false;
-        }
+        File file = new File(filename);
+        return file.exists() && !file.isDirectory();
     }
     public static boolean file_put_contents(String filename, String data){
-        try {
-            FileWriter fstream = new FileWriter(filename,false);
-            BufferedWriter out = new BufferedWriter(fstream);
-            out.write(data);
-            out.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    FileWriter fstream = new FileWriter(filename,false);
+                    BufferedWriter out = new BufferedWriter(fstream);
+                    out.write(data);
+                    out.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
         return true;
     }
     public static void echo(String msg){
