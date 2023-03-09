@@ -14,8 +14,20 @@ commands:
   nearSota:
     description: Соты поблизости
     usage: /nearSota
-    permission: sotaradio.nearSota
-  userParamSota:
+  userParams:
     description: Параметры Пользователя
-    usage: /userParamSota <Параметр> <Значение>
-    permission: sotaradio.upSota
+    usage: /paramUser <Параметр> <Значение>
+  myOperator:
+    description: Установить оператора
+    usage: /myOperator <Имя>
+  helpSota:
+    description: Инфо
+    usage: /helpSota
+  permissions:
+    sotaradio.*:
+      description: Все права
+    sotaradio.delSota:
+      description: Право на удаление соты
+    sotaradio.newSota:
+      description: Право на создание соты
+

@@ -8,14 +8,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.logging.Logger;
 
 import static ru.yoricya.privat.sota.sotaandradio.php.*;
@@ -23,10 +24,27 @@ import static ru.yoricya.privat.sota.sotaandradio.php.*;
 public final class SotaAndRadio extends JavaPlugin implements Listener {
     Logger log =Logger.getLogger("SotaAndRadio");
     public static JSONObject Sotas;
-    public JSONObject allBossbars = new JSONObject();
+   // public JSONObject allBossbars = new JSONObject();
     public static Server Server;
     @Override
     public void onEnable() {
+/*        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
+
+        MarkerAPI markerApi = dynmap.getMarkerAPI(); // Получить доступ к API маркеров
+        MarkerSet markerSet = markerApi.getMarkerSet("markerSetId"); // Получить существующий набор маркеров или создать новый
+        if (markerSet == null) {
+            markerSet = markerApi.createMarkerSet("markerSetId", "Marker Set Name", null, false); // Создать новый набор маркеров
+        }
+
+// Создать новый маркер с координатами x, y, z на карте в мире worldName
+        MarkerIcon markerIcon = markerApi.getMarkerIcon("iconId"); // Получить иконку маркера
+        if (markerIcon == null) {
+            markerIcon = markerApi.getMarkerIcon("default"); // Использовать иконку по умолчанию, если не удается найти иконку с указанным идентификатором
+        }
+        markerSet.createMarker("markerId", "Marker Label", worldName, x, y, z, markerIcon, false); // Создать новый маркер
+
+
+ */
         try {
             getServer().getPluginManager().registerEvents(this, this);
             Server = this.getServer();
@@ -45,52 +63,52 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        for(int ib = 0; ib < allBossbars.length(); ib++) {
-            try {
-                BossBar bs = (BossBar) allBossbars.get(String.valueOf(ib));
-                bs.removeAll();
-            }catch (Exception e){
-                //e.printStackTrace();
-            }
-        }
-        allBossbars.clear();
+
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        final boolean[] tru = {false};
         new Thread(new Runnable() {
             @Override
             public void run() {
         try{
 
         if(command.getName().equals("newSota")){
+            if(!(sender instanceof Player)) {
+                sender.sendMessage("Эту команду может выполнять только игрок!");
+                return;
+            }
             if(args.length < 4){
-                sender.sendMessage("Не все арги указаны!");
-                tru[0] = false;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
+                sender.sendMessage("/newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>");
                 return;
             }
             Sota sot =  new Sota();
             sot.newSota(sender.getServer().getPlayer(sender.getName()) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
             sot.id = Sotas.length();
             Sotas.put(String.valueOf(Sotas.length()), sot.toString());
-            sender.sendMessage("Сота создана! ID cоты:"+sot.id);
-            tru[0] = true;
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                    "&a&lСота создана! ID cоты:"+sot.id));
+           
                 return;
         }
         if(command.getName().equals("delSota")){
             if(args.length < 1){
-                sender.sendMessage("Не все арги указаны!");
-                tru[0] = false;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
+                sender.sendMessage("/delSota <Имя>");
                 return;
             }
             Sota sot = new Sota(Sotas.getString(args[0]));
             sot.Description = "OFF";
             Sotas.put(String.valueOf(args[0]), sot.toString());
-            sender.sendMessage("Сота удалена!");
-            tru[0] = true;
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&eСота удалена!"));
+           
                 return;
         }
         if(command.getName().equals("nearSota")){
+            if(!(sender instanceof Player)) {
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lЭту команду можно выполнять только от игрока!"));
+                return;
+            }
             Sota sot = new Sota();
             int dist = 1000;
             for(int i = 0; i < Sotas.length(); i++) {
@@ -104,21 +122,38 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         sot = sotv;
                     }
             }
-            sender.sendMessage("Ближайшая к вам сота, ID: "+sot.id+" - Имя: "+sot.Name+" - Тип: "+sot.Type);
-            tru[0] = true;
+            if(sot.Name == null){
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lБлижайших к вам сот не обнаружено!"));
+                return;
+            }
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "" +
+                    "&a&lБлижайшая к вам сота, ID: &n("+sot.id+")&r&l," +
+                    "\n&lИмя: &n("+sot.Name+")&r&l," +
+                    "\n&lТип: &n("+sot.Type+")&r&l," +
+                    "\n&lМощность: &n("+sot.Wats+")&r&l," +
+                    "\n&lКомментарий к соте: &n("+sot.Description+")&r&l," +
+                    "\n&lРасстояние: &n("+distance(getServer().getPlayer(sender.getName()), sot)+")&r&l."));
+           
                 return;
         }
 
 
-        if(command.getName().equals("userParamSota")) {
+        if(command.getName().equals("userParams")) {
+            if(!(sender instanceof Player)) {
+                sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                return;
+            }
             if (args.length < 2) {
-                sender.sendMessage("OperatorTest <1/0> (Проверять ли соты на соответствие оператора)" +
-                        "\nOperator <Имя> (Установить оператора)" +
-                        "\nRadio <1/0> (Включить отображение радиостанций)" +
-                        "\nTV <1/0> (Включить отображение TV)" +
-                        "\nWIFI <1/0> (Включить отображение WIFI)" +
-                        "\nMOBILE <1/0> (Включить отображение Мобильных Сетей)");
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
+                        "\n&l&nOperator <Имя>&r&l (Установить оператора)" +
+                        "\n&l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                        "\n&l&nTV <1/0>&r&l (Включить отображение TV)" +
+                        "\n&l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                        "\n&l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+               
                 return;
             }
             JSONObject plrSets = new JSONObject();
@@ -140,57 +175,199 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             if (args[0].equalsIgnoreCase("OperatorTest")) {
                 plrSets.put("optest", args[1].equalsIgnoreCase("1"));
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("Radio")) {
                 plrSets.put("offradio", args[1].equalsIgnoreCase("1"));
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("TV")) {
                 plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("WIFI")) {
                 plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("MOBILE")) {
                 plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("Operator")) {
                 plrSets.put("operator", args[1]);
                 file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                tru[0] = true;
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[0]));
                 return;
-            } else {tru[0] = false;}
+            }else{
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
+                        "\n&l&nOperator <Имя>&r&l (Установить оператора)" +
+                        "\n&l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                        "\n&l&nTV <1/0>&r&l (Включить отображение TV)" +
+                        "\n&l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                        "\n&l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+
+            }
         }
+
+        if(command.getName().equalsIgnoreCase("myOperator")) {
+            if(args.length == 0){}
+            JSONObject plrSets = new JSONObject();
+            if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
+                plrSets.put("operator", "none");
+                plrSets.put("offmob", false);
+                plrSets.put("optest", false);
+                plrSets.put("offtv", false);
+                plrSets.put("offradio", false);
+                plrSets.put("offwifi", false);
+                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+            } else {
+                try {
+                    plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if(args.length == 0){
+                plrSets.put("operator", "n");
+                return;
+            }
+            plrSets.put("operator", args[0]);
+            file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[0]));
+            return;
+        }
+
+        if(command.getName().equalsIgnoreCase("helpSota")) {
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                    "&l&n&a/helpSota&r&l&a - Показать этот список,"));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/myOperator <Имя>&r&l - Установить оператора."));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                    "&l&n/userParam&r&l - Настройка параметров пользователя."));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                    "&l&n/myOperator <Имя>&r&l - Установить оператора."));
+            if (sender.isOp()) {
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/newSota&r&l - Создать новую соту."));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/delSota&r&l - Удалить соту"));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/nearSota&r&l - Найти ближайшую соту."));
+            }
+        }
+
         }catch (Exception e){
-            tru[0] =false;
+          e.printStackTrace();
+          sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lПроизошла ошибка!"));
         }
             }
         }).start();
-        sender.sendMessage(String.valueOf(tru[0]));
-        return tru[0];
+        return true;
     }
     public static Material getBlockType(int x, int y, int z){
         return Server.getWorld("World").getBlockAt(x, y, z).getType();
     }
 
     @EventHandler
+    public void onMove(PlayerMoveEvent e) {
+       /* Plugin pl = this;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int px = (int) e.getPlayer().getLocation().getX();
+                int py = (int) e.getPlayer().getLocation().getY();
+                int pz = (int) e.getPlayer().getLocation().getZ();
+                float p = (int) e.getPlayer().getLocation().getPitch();
+                if(pz < -18391) {
+                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+                        public void run() {
+                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+                                public void run() {
+                                    Location l = new Location(getServer().getWorld("World"), px, py, pz + 2);
+                                    l.setPitch(p);
+                                    l.setYaw(180);
+                                    e.getPlayer().teleport(l);
+                                }
+                            });
+                        }
+                    });
+                }
+                if(pz > 18391) {
+                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+                        public void run() {
+                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+                                public void run() {
+                                    Location l = new Location(getServer().getWorld("World"), px, py, pz - 2);
+                                    //l.setPitch(p);
+                                    l.setYaw(180);
+                                    e.getPlayer().teleport(l);
+                                }
+                            });
+                        }
+                    });
+                }
+                //9200
+            }
+        }).start();
+
+
+
+        */
+    }
+
+    @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        final int[] px = {0};
+        final int[] py = {0};
+        final int[] pz = {0};
+
         final JSONObject[] plrSets = {new JSONObject()};
         JSONObject Bossbars = new JSONObject();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (!if_file_exs("Sotas/" + event.getPlayer().getName() + ".json")) {
+                    plrSets[0].put("operator", "none");
+                    plrSets[0].put("offmob", false);
+                    plrSets[0].put("optest", false);
+                    plrSets[0].put("offtv", false);
+                    plrSets[0].put("offradio", false);
+                    plrSets[0].put("offwifi", false);
+                    event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                            "&a&lПривет! &e&lДля помощи по сотам используй &r&l&n/helpSota"));
+                    file_put_contents("Sotas/" + event.getPlayer().getName() + ".json", plrSets[0].toString());
+                } else {
+
+                    try {
+                        plrSets[0] = new JSONObject(file_get_contents("Sotas/" + event.getPlayer().getName() + ".json"));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
         final int[] ak = {1};
         final boolean[] a = {false};
         new Thread(new BukkitRunnable() {
             @Override
             public void run() {
+                if(px[0] == (int)event.getPlayer().getLocation().getX() & py[0] ==(int)event.getPlayer().getLocation().getY() & pz[0] ==(int)event.getPlayer().getLocation().getZ()) {
+                    return;
+                }
                 new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        px[0] = (int) event.getPlayer().getLocation().getX();
+                        py[0] = (int) event.getPlayer().getLocation().getY();
+                        pz[0] = (int) event.getPlayer().getLocation().getZ();
+                    }
+                }).start();
+
+                    new Thread(new Runnable() {
                     @Override
                     public void run() {
                         file_put_contents("Sotas/Sotas.json", Sotas.toString());
@@ -350,7 +527,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
-                        allBossbars.put(String.valueOf(Bossbars.length()), bsnet);
                         Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
                     }catch (Exception e){
                         e.printStackTrace();
@@ -366,7 +542,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             //}
                             bsnet.addPlayer(event.getPlayer());
                             Bossbars.put(String.valueOf(Bossbars.length()), bsnet);
-                            allBossbars.put(String.valueOf(Bossbars.length()), bsnet);
                         }
 
                 BukkitRunnable b = this;
@@ -379,11 +554,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                                 try {
                                     BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
                                     bs.removeAll();
-                                }catch (Exception e){
+                                } catch (Exception e) {
                                     e.printStackTrace();
                                 }
                             }
-                            allBossbars.clear();
                             if(event.getPlayer().isOnline()) onPlayerJoin(event);
                             return;
                         }
