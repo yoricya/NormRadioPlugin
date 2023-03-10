@@ -17,6 +17,7 @@ import org.bukkit.util.Vector;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.sql.Time;
 import java.util.logging.Logger;
 
 import static ru.yoricya.privat.sota.sotaandradio.php.*;
@@ -28,6 +29,19 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     public static Server Server;
     @Override
     public void onEnable() {
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if(!if_dir_exs("Sotas"))
+                    mkdir("Sotas");
+                if(!if_dir_exs("Sotas/BKP"))
+                    mkdir("Sotas/BKP");
+                if(!if_file_exs("Sotas/Sotas.json"))
+                    file_put_contents("Sotas/Sotas.json", "{}");
+            }
+        }).start();
+
 /*        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
 
         MarkerAPI markerApi = dynmap.getMarkerAPI(); // Получить доступ к API маркеров
@@ -273,7 +287,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
-       /* Plugin pl = this;
+        Plugin pl = this;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -312,10 +326,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 //9200
             }
         }).start();
-
-
-
-        */
     }
 
     @EventHandler
@@ -330,6 +340,15 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         new Thread(new Runnable() {
             @Override
             public void run() {
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                     //Бекапы
+                        new Time(System.nanoTime());
+                    }
+                }).start();
+
                 if (!if_file_exs("Sotas/" + event.getPlayer().getName() + ".json")) {
                     plrSets[0].put("operator", "none");
                     plrSets[0].put("offmob", false);
@@ -358,6 +377,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 if(px[0] == (int)event.getPlayer().getLocation().getX() & py[0] ==(int)event.getPlayer().getLocation().getY() & pz[0] ==(int)event.getPlayer().getLocation().getZ()) {
                     return;
                 }
+
                 new Thread(new Runnable() {
                     @Override
                     public void run() {

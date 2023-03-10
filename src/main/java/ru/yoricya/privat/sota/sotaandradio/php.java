@@ -4,6 +4,9 @@ import org.json.JSONObject;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.ThreadLocalRandom;
@@ -47,6 +50,13 @@ public class php {
     public static boolean if_file_exs(String filename) {
         File file = new File(filename);
         return file.exists() && !file.isDirectory();
+    }
+    public static boolean if_dir_exs(String dir){
+        Path path = Paths.get(dir);
+        return  (Files.exists(path));
+    }
+    public static void mkdir(String dir){
+        new File(dir).mkdirs();
     }
     public static boolean file_put_contents(String filename, String data){
         new Thread(new Runnable() {
