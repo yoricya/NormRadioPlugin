@@ -23,11 +23,38 @@ commands:
   helpSota:
     description: Инфо
     usage: /helpSota
-  permissions:
-    sotaradio.*:
-      description: Все права
-    sotaradio.delSota:
-      description: Право на удаление соты
-    sotaradio.newSota:
-      description: Право на создание соты
+  setPhone:
+    description: setPhone
+    usage: /setPhone <Оператор> <Макс сеть> <Имя телефона>
+  infoPhone:
+    description: infoPhone
+    usage: /infoPhone
+  delPhone:
+    description: delPhone
+    usage: /delPhone
+  newMark:
+    description: New Marker
+    usage: /newMark
+  delMark:
+    description: Remove Marker
+    usage: /delMark
+  gm:
+    description: Gamemode
+    usage: /gm <Mode>
+  setHome:
+    description: Gamemode
+    usage: /gm <Mode>
+  tptoHome:
+    description: Gamemode
+    usage: /gm <Mode>
+  delHome:
+    description: Gamemode
+    usage: /gm <Mode>
+permissions:
+  sotaradio.*:
+    description: Все права
+  sotaradio.delSota:
+    description: Право на удаление соты
+  sotaradio.newSota:
+    description: Право на создание соты
 

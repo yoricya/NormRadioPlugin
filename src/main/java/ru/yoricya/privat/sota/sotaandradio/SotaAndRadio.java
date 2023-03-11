@@ -7,17 +7,29 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.material.MaterialData;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.dynmap.DynmapAPI;
+import org.dynmap.markers.Marker;
+import org.dynmap.markers.MarkerAPI;
+import org.dynmap.markers.MarkerIcon;
+import org.dynmap.markers.MarkerSet;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.sql.Time;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 import static ru.yoricya.privat.sota.sotaandradio.php.*;
@@ -42,23 +54,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
         }).start();
 
-/*        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
 
-        MarkerAPI markerApi = dynmap.getMarkerAPI(); // Получить доступ к API маркеров
-        MarkerSet markerSet = markerApi.getMarkerSet("markerSetId"); // Получить существующий набор маркеров или создать новый
-        if (markerSet == null) {
-            markerSet = markerApi.createMarkerSet("markerSetId", "Marker Set Name", null, false); // Создать новый набор маркеров
-        }
-
-// Создать новый маркер с координатами x, y, z на карте в мире worldName
-        MarkerIcon markerIcon = markerApi.getMarkerIcon("iconId"); // Получить иконку маркера
-        if (markerIcon == null) {
-            markerIcon = markerApi.getMarkerIcon("default"); // Использовать иконку по умолчанию, если не удается найти иконку с указанным идентификатором
-        }
-        markerSet.createMarker("markerId", "Marker Label", worldName, x, y, z, markerIcon, false); // Создать новый маркер
-
-
- */
         try {
             getServer().getPluginManager().registerEvents(this, this);
             Server = this.getServer();
@@ -93,7 +89,15 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
             if(args.length < 4){
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
-                sender.sendMessage("/newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>");
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТипы сети:&r" +
+                        "\n &r&l&nwifi&r&l - Wi-Fi сеть." +
+                        "\n &r&l&ngsm&r&l - GSM (2G) сеть." +
+                        "\n &r&l&nedge&r&l - EDGE (2G) сеть."+
+                        "\n &r&l&n3g&r&l - 3G (3G) сеть."+
+                        "\n &r&l&n4g&r&l - 4G (4G) сеть."+
+                        "\n &r&lЛибо укажите частоту: &n'101.2FM'&r"));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                        "&e&l/newSota <Имя> <Частота или Тип> <Мощность в ваттах, пример: '1.0'> <Коментарий, по умолчанию: 'n'>"));
                 return;
             }
             Sota sot =  new Sota();
@@ -114,7 +118,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             Sota sot = new Sota(Sotas.getString(args[0]));
             sot.Description = "OFF";
             Sotas.put(String.valueOf(args[0]), sot.toString());
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&eСота удалена!"));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lСота удалена!"));
            
                 return;
         }
@@ -142,11 +146,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
             sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "" +
                     "&a&lБлижайшая к вам сота, ID: &n("+sot.id+")&r&l," +
-                    "\n&lИмя: &n("+sot.Name+")&r&l," +
-                    "\n&lТип: &n("+sot.Type+")&r&l," +
-                    "\n&lМощность: &n("+sot.Wats+")&r&l," +
-                    "\n&lКомментарий к соте: &n("+sot.Description+")&r&l," +
-                    "\n&lРасстояние: &n("+distance(getServer().getPlayer(sender.getName()), sot)+")&r&l."));
+                    "\n &lИмя: &n("+sot.Name+")&r&l," +
+                    "\n &lТип: &n("+sot.Type+")&r&l," +
+                    "\n &lМощность: &n("+sot.Wats+")&r&l," +
+                    "\n &lКомментарий к соте: &n("+sot.Description+")&r&l," +
+                    "\n &lРасстояние: &n("+distance(getServer().getPlayer(sender.getName()), sot)+")&r&l."));
            
                 return;
         }
@@ -162,11 +166,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
                         "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
-                        "\n&l&nOperator <Имя>&r&l (Установить оператора)" +
-                        "\n&l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
-                        "\n&l&nTV <1/0>&r&l (Включить отображение TV)" +
-                        "\n&l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
-                        "\n&l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+                        "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
+                        "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                        "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
+                        "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                        "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
                
                 return;
             }
@@ -221,17 +225,17 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
                         "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
-                        "\n&l&nOperator <Имя>&r&l (Установить оператора)" +
-                        "\n&l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
-                        "\n&l&nTV <1/0>&r&l (Включить отображение TV)" +
-                        "\n&l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
-                        "\n&l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+                        "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
+                        "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                        "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
+                        "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                        "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
 
             }
         }
 
         if(command.getName().equalsIgnoreCase("myOperator")) {
-            if(args.length == 0){}
+           /* if(args.length == 0){}
             JSONObject plrSets = new JSONObject();
             if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
                 plrSets.put("operator", "none");
@@ -254,24 +258,247 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
             plrSets.put("operator", args[0]);
             file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[0]));
+
+            */
+            if(!(sender instanceof Player)) {
+                sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                return;
+            }
+            if(args.length == 0){
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/myOperator <Имя Оператора>"));
+                return;
+            }
+            ItemStack is = ((Player) sender).getPlayer().getItemInHand();
+            ItemMeta im = is.getItemMeta();
+            is.setItemMeta(im);
+            setTag(is, "op", args[0]);
+            ((Player) sender).getPlayer().setItemInHand(is);
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь телефон привязан к оператору: &n"+args[0]));
             return;
         }
 
         if(command.getName().equalsIgnoreCase("helpSota")) {
             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                    "&l&n&a/helpSota&r&l&a - Показать этот список,"));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/myOperator <Имя>&r&l - Установить оператора."));
+                    "&a&l&n/helpSota&r&a&l - Показать этот список,"));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &l&n/myOperator <Имя>&r&l - Установить оператора."));
             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                    "&l&n/userParam&r&l - Настройка параметров пользователя."));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                    "&l&n/myOperator <Имя>&r&l - Установить оператора."));
+                    " &l&n/userParam&r&l - Настройка параметров пользователя."));
             if (sender.isOp()) {
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/newSota&r&l - Создать новую соту."));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/delSota&r&l - Удалить соту"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&n/nearSota&r&l - Найти ближайшую соту."));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/newSota&r&l - Создать новую соту."));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/delSota&r&l - Удалить соту"));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/nearSota&r&l - Найти ближайшую соту."));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/setPhone&r&l - Создать новый телефон."));
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/delPhone&r&l - Деактивировать телефон."));
             }
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/infoPhone&r&l - Информация о телефоне."));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
+            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
         }
+
+            if(command.getName().equalsIgnoreCase("setPhone")) {
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                    return;
+                }
+                if (sender.isOp()) {
+                    if(args.length < 2){
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                                "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/setPhone <Имя Оператора, по умолчанию: 'n'> <Максимально поддерживаемая сеть> <Имя телефона>"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                                " &lИмя Оператора можно не указывать, Вместо него вставьте букву &n'n'&r"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                                " &a&lВ имени телефона поддерживаются управляющие символы '&n&'&r&a&l которые делают текст цветным! &c&lНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                                "\n &c&lНБТ Теги телефона наложатся на предмет в вашей руке!"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                                "&lВсе типы сетей:" +
+                                "\n &r&n&l1&r&l - &lGSM Только связь и смски. &a&l(Относится к сетям 2G)" +
+                                "\n &n&l2&r&l - &lEDGE Связь и слабый интернет. &a&l(Относится к сетям 2G)" +
+                                "\n &n&l3&r&l - &l3G Связь и быстрый интернет. &a&l(Относится к сетям 3G)" +
+                                "\n &n&l4&r&l - &l4G Только быстрый интернет. &a&l(Относится к сетям 4G)"));
+                        return;
+                    }
+                    ItemStack is = ((Player) sender).getPlayer().getItemInHand();
+                    ItemMeta im = is.getItemMeta();
+                    Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', args[2]));
+                    is.setItemMeta(im);
+                    setTag(is, "ph", "1");
+                    setTag(is, "op", args[0]);
+                    setTag(is, "mn", args[1]);
+                    ((Player) sender).getPlayer().setItemInHand(is);
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
+                } else {
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lУ вас нет прав для использования этой команды!"));
+                    return;
+                }
+            }
+
+            if(command.getName().equalsIgnoreCase("newMark")) {
+                if (!sender.isOp()) {
+                    return;
+                }
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                    return;
+                }
+                if(args.length < 2){
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/newMark <Группа> <Имя> <Комментарий>&r"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                            " &a&lГруппы(Можно так-же писать кастомые группы, &c&lглавное не засирать их!&r&a&l):&r" +
+                            "\n &l&nCity&r&e&l - Группа маркеров для городов.&r" +
+                            "\n &l&nVillage&r&e&l - Группа маркеров для сёл, и деревень.&r"));
+                    return;
+                }
+                int px = (int)((Player) sender).getPlayer().getLocation().getX();
+                int py = (int)((Player) sender).getPlayer().getLocation().getY();
+                int pz = (int)((Player) sender).getPlayer().getLocation().getZ();
+                int id = rand(-999999, 9999999);
+                StringBuilder comment = new StringBuilder();
+                for(int i = 2; i < args.length; i++) {
+                    comment.append(args[i]);
+                    comment.append(" ");
+                }
+                        if(
+                addMarker(String.valueOf(id), args[0], args[1], ((Player) sender).getPlayer().getWorld().getName(),
+                        px, py, pz, comment.toString()))
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&a&lМаркер создан! ID Маркера: &n"+id+"&r"));
+                        else
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
+            }
+
+            if(command.getName().equalsIgnoreCase("delMark")) {
+                if (!sender.isOp()) {
+                    return;
+                }
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                    return;
+                }
+                if(args.length < 1){
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/delMark <Группа> <ID>&r"));
+                    return;
+                }
+                if(removeMarker(args[1], args[0]))
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lМаркер удален!&r"));
+                else sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
+            }
+
+            if(command.getName().equalsIgnoreCase("delPhone")) {
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                    return;
+                }
+                if (sender.isOp()) {
+                    ItemStack is = ((Player) sender).getPlayer().getItemInHand();
+                    ItemMeta im = is.getItemMeta();
+                    Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', "&c&l(Telephone Deactivated!)"));
+                    is.setItemMeta(im);
+                    setTag(is, "ph", "0");
+                    ((Player) sender).getPlayer().setItemInHand(is);
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
+                } else {
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lУ вас нет прав для использования этой команды!"));
+                    return;
+                }
+            }
+
+            if(command.getName().equalsIgnoreCase("gm")) {
+                if (!sender.isOp()) {
+                    return;
+                }
+                if(args.length < 1){
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                        return;
+                    }
+                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
+                        public void run() {
+                    if(((Player) sender).getPlayer().getGameMode() == GameMode.CREATIVE){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.SURVIVAL);
+                    }else if(((Player) sender).getPlayer().getGameMode() == GameMode.SURVIVAL){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.CREATIVE);
+                    }else{
+                        ((Player) sender).getPlayer().setGameMode(GameMode.CREATIVE);
+                    }
+                        }
+                    });
+                }else  if(args.length > 1){
+                    Player pl = getServer().getPlayer(args[1]);
+                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
+                        public void run() {
+                            if(args[0].equalsIgnoreCase("0")){
+                                pl.setGameMode(GameMode.SURVIVAL);
+                            }else
+                            if(args[0].equalsIgnoreCase("1")){
+                                pl.setGameMode(GameMode.CREATIVE);
+                            }else
+                            if(args[0].equalsIgnoreCase("2")){
+                                pl.setGameMode(GameMode.ADVENTURE);
+                            }else
+                            if(args[0].equalsIgnoreCase("3")){
+                                pl.setGameMode(GameMode.SPECTATOR);
+                            }
+                            else{
+                                pl.setGameMode(GameMode.SURVIVAL);
+                            }
+                            pl.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                    "&lВаш режим игры изменен игроком: &n"+sender.getName()+"&r"));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                    "&lРежим игры игрока: &n"+pl.getName()+"&r&l Успешно изменен!"));
+                        }
+                    });
+                }
+                else{
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                        return;
+                    }
+                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
+                        public void run() {
+                    if(args[0].equalsIgnoreCase("0")){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.SURVIVAL);
+                    }else
+                    if(args[0].equalsIgnoreCase("1")){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.CREATIVE);
+                    }else
+                    if(args[0].equalsIgnoreCase("2")){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.ADVENTURE);
+                    }else
+                    if(args[0].equalsIgnoreCase("3")){
+                        ((Player) sender).getPlayer().setGameMode(GameMode.SPECTATOR);
+                    }
+
+                }
+            });
+                }
+            }
+
+            if(command.getName().equalsIgnoreCase("infoPhone")) {
+                ItemStack is = ((Player) sender).getPlayer().getItemInHand();
+                String v = "Нет";
+                String net = "Нет";
+                if(!getTag(is, "op").equalsIgnoreCase("n")){
+                    v = getTag(is, "op");
+                }
+                if(getTag(is, "mn").equalsIgnoreCase("1")){
+                    net = "GSM (2G)";
+                }else if(getTag(is, "mn").equalsIgnoreCase("2")){
+                    net = "EDGE (2G)";
+                }else if(getTag(is, "mn").equalsIgnoreCase("3")){
+                    net = "3G (3G)";
+                }else if(getTag(is, "mn").equalsIgnoreCase("4")){
+                    net = "4G (4G)";
+                }
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+                        "&a&lИнформация о телефоне:" +
+                        "\n &r&lПривязка к оператору: &n"  +v+"&r"+
+                        "\n &lПоддержка сетей: &n" +net+"&r"));
+            }
 
         }catch (Exception e){
           e.printStackTrace();
@@ -281,9 +508,90 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }).start();
         return true;
     }
+
+    public boolean removeMarker(String id, String group)
+    {
+        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
+        boolean removed = false;
+        if (dynmap != null && dynmap.markerAPIInitialized())
+        {
+            MarkerAPI markers = dynmap.getMarkerAPI();
+            MarkerSet markerSet = markers.getMarkerSet(group);
+            if (markerSet != null) {
+                Marker marker = markerSet.findMarker(id);
+                if (marker != null) {
+                    removed = true;
+                    marker.deleteMarker();
+                }
+            }
+        }
+        return removed;
+    }
+
+    public boolean addMarker(String id, String group, String title, String world, int x, int y, int z, String description) {
+        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
+
+        String ico = "testico.png";
+        String icos = "testico";
+        if(group.equalsIgnoreCase("city")) ico = "cityico.png";
+        if(group.equalsIgnoreCase("city")) icos = "cityico";
+
+        if(group.equalsIgnoreCase("village")) ico = "village.png";
+        if(group.equalsIgnoreCase("village")) icos = "village";
+
+        boolean created = false;
+        if (dynmap != null && dynmap.markerAPIInitialized())
+        {
+            MarkerAPI markers = dynmap.getMarkerAPI();
+
+            MarkerSet markerSet = markers.getMarkerSet(group);
+            if (markerSet == null) {
+                markerSet = markers.createMarkerSet(group, group, null, true);
+            }
+            MarkerIcon wandIcon = markers.getMarkerIcon(icos);
+            if (wandIcon == null) {
+               wandIcon = markers.createMarkerIcon(icos, icos, getPlugin().getResource(ico));
+            }
+            Marker marker = markerSet.findMarker(id);
+            if (marker == null) {
+                created = true;
+                marker = markerSet.createMarker(id, title, world, x, y, z, wandIcon, true);
+            } else {
+                marker.setLocation(world, x, y, z);
+                marker.setLabel(title);
+            }
+            if (description != null) {
+                marker.setDescription(description);
+            }
+        }
+        return created;
+    }
+
+    public ItemStack setTag(ItemStack is, String key, String val){
+        NamespacedKey keyp = new NamespacedKey(getPlugin(), key);
+        ItemMeta meta= is.getItemMeta();
+        if(meta == null) return null;
+        meta.getPersistentDataContainer().set(keyp, PersistentDataType.STRING, val);
+        is.setItemMeta(meta);
+        return is;
+    }
+    public String getTag(ItemStack is, String key){
+        NamespacedKey keyp = new NamespacedKey(getPlugin(), key);
+        ItemMeta meta= is.getItemMeta();
+        if(meta == null) return "";
+        PersistentDataContainer container = meta.getPersistentDataContainer();
+        String foundValue = "";
+        if(container.has(keyp , PersistentDataType.STRING)) {
+            foundValue = container.get(keyp, PersistentDataType.STRING);
+        }
+        return foundValue;
+    }
+
     public static Material getBlockType(int x, int y, int z){
         return Server.getWorld("World").getBlockAt(x, y, z).getType();
     }
+
+
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
@@ -328,6 +636,14 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }).start();
     }
 
+
+    @EventHandler
+    public void onPlayerChat(AsyncPlayerChatEvent e) {
+        e.setCancelled(true);
+        getServer().broadcastMessage(ChatColor.translateAlternateColorCodes('&',
+                "&l&n"+e.getPlayer().getName()+"&r&l > "+e.getMessage()+"&r"));
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         final int[] px = {0};
@@ -345,7 +661,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     @Override
                     public void run() {
                      //Бекапы
-                        new Time(System.nanoTime());
+                       // new Time(System.nanoTime());
                     }
                 }).start();
 
@@ -402,9 +718,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                                 plrSets[0].put("offwifi", false);
                                 file_put_contents("Sotas/"+event.getPlayer().getName()+".json", plrSets[0].toString());
                             }else{
-
                                 plrSets[0] = new JSONObject(file_get_contents("Sotas/"+event.getPlayer().getName()+".json"));
-
                             }
                         }catch (Exception e){
                             e.printStackTrace();
@@ -430,9 +744,16 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
                 Bossbars.clear();
                 int net = 0;
+                int maxnet = 5;
                 double[] netprec = new double[4];
                 BossBar bsnet = null;
-                if(plrSets[0].getBoolean("optest"))  bsnet = getServer().createBossBar("n", BarColor.BLUE, BarStyle.SOLID, BarFlag.DARKEN_SKY);
+                if(plrSets[0].getBoolean("optest")) { bsnet = getServer().createBossBar("n", BarColor.BLUE, BarStyle.SOLID, BarFlag.DARKEN_SKY);
+                    ItemStack is = event.getPlayer().getItemInHand();
+                    if(!getTag(is, "ph").equalsIgnoreCase("1")) return;
+                    plrSets[0].put("operator", getTag(is, "op"));
+                    maxnet = Integer.parseInt(getTag(is, "mn"));
+                    net = Integer.parseInt(getTag(is, "mn")) - 1;
+                }
                 for(int i = 0; i < Sotas.length(); i++) {
                     try {
                         Sota sota;
@@ -442,7 +763,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                                 continue;
                             }
                         }catch (Exception e){
-                           // e.printStackTrace();
+
                             continue;
                         }
                         double prec = SotaSignalPrecent(event.getPlayer(), sota);
@@ -468,6 +789,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             bc = BarColor.WHITE;
                         }else
                         if(st.equalsIgnoreCase("GSM")) {
+                            if(maxnet < 1) continue;
                             st = "GSM";
                             bc = BarColor.RED;
                             if(plrSets[0].getBoolean("offmob")) continue;
@@ -485,6 +807,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
                         }else
                         if(st.equalsIgnoreCase("EDGE")) {
+                            if(maxnet < 2) continue;
                             st = "EDGE";
                             bc = BarColor.YELLOW;
                             if(plrSets[0].getBoolean("offmob")) continue;
@@ -502,6 +825,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
                         }else
                         if(st.equalsIgnoreCase("3G")) {
+                            if(maxnet < 3) continue;
                             st = "3G";
                             bc = BarColor.GREEN;
                             if(plrSets[0].getBoolean("offmob")) continue;
@@ -519,6 +843,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
                         }else
                         if(st.equalsIgnoreCase("4G")) {
+                            if(maxnet < 4) continue;
                             st = "LTE";
                             bc = BarColor.GREEN;
                             if(plrSets[0].getBoolean("offmob")) continue;
