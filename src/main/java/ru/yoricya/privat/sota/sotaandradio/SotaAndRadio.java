@@ -178,7 +178,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
                 plrSets.put("operator", "none");
                 plrSets.put("offmob", false);
-                plrSets.put("optest", false);
+                plrSets.put("optest", true);
                 plrSets.put("offtv", false);
                 plrSets.put("offradio", false);
                 plrSets.put("offwifi", false);
@@ -668,7 +668,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 if (!if_file_exs("Sotas/" + event.getPlayer().getName() + ".json")) {
                     plrSets[0].put("operator", "none");
                     plrSets[0].put("offmob", false);
-                    plrSets[0].put("optest", false);
+                    plrSets[0].put("optest", true);
                     plrSets[0].put("offtv", false);
                     plrSets[0].put("offradio", false);
                     plrSets[0].put("offwifi", false);
