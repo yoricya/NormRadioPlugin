@@ -406,7 +406,28 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     return;
                 }
             }
-
+           /* if(command.getName().equalsIgnoreCase("sethome")) {
+                JSONObject plrSets = new JSONObject();
+                if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
+                    plrSets.put("operator", "none");
+                    plrSets.put("offmob", false);
+                    plrSets.put("optest", true);
+                    plrSets.put("offtv", false);
+                    plrSets.put("offradio", false);
+                    plrSets.put("offwifi", false);
+                    file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                } else {
+                    try {
+                        plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                if(args.length < 1){
+                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                }
+            }
+*/
             if(command.getName().equalsIgnoreCase("gm")) {
                 if (!sender.isOp()) {
                     return;
@@ -752,7 +773,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if(!getTag(is, "ph").equalsIgnoreCase("1")) return;
                     plrSets[0].put("operator", getTag(is, "op"));
                     maxnet = Integer.parseInt(getTag(is, "mn"));
-                    net = Integer.parseInt(getTag(is, "mn")) - 1;
+                    //net = Integer.parseInt(getTag(is, "mn")) - 1;
                 }
                 for(int i = 0; i < Sotas.length(); i++) {
                     try {
@@ -763,7 +784,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                                 continue;
                             }
                         }catch (Exception e){
-
                             continue;
                         }
                         double prec = SotaSignalPrecent(event.getPlayer(), sota);
