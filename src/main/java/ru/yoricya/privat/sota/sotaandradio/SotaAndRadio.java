@@ -1,6 +1,7 @@
 package ru.yoricya.privat.sota.sotaandradio;
 
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.boss.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -19,16 +20,21 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.BlockIterator;
 import org.bukkit.util.Vector;
-import org.dynmap.DynmapAPI;
-import org.dynmap.markers.Marker;
-import org.dynmap.markers.MarkerAPI;
-import org.dynmap.markers.MarkerIcon;
-import org.dynmap.markers.MarkerSet;
+////import org.dynmap.DynmapAPI;
+//import org.dynmap.markers.Marker;
+//import org.dynmap.markers.MarkerAPI;
+//import org.dynmap.markers.MarkerIcon;
+//import org.dynmap.markers.MarkerSet;
+import org.checkerframework.common.returnsreceiver.qual.This;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.sql.Time;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.logging.Logger;
 
@@ -39,6 +45,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     public static JSONObject Sotas;
    // public JSONObject allBossbars = new JSONObject();
     public static Server Server;
+    public static List<Material> passableBlocks = new ArrayList<>();
     @Override
     public void onEnable() {
 
@@ -51,9 +58,22 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     mkdir("Sotas/BKP");
                 if(!if_file_exs("Sotas/Sotas.json"))
                     file_put_contents("Sotas/Sotas.json", "{}");
+                if(!if_file_exs("passable_blocks.txt"))
+                    file_put_contents("passable_blocks.txt", Material.AIR.name()+"=");
             }
         }).start();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try{
+                    List<String> psbl = Arrays.asList(file_get_contents("passable_blocks.txt").split("="));
+                    psbl.forEach(block ->{
+                        passableBlocks.add(Material.getMaterial(block));
+                    });
+                }catch(Exception e){}
 
+            }
+        }).start();
 
         try {
             getServer().getPluginManager().registerEvents(this, this);
@@ -73,14 +93,71 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        StringBuilder passblocks = new StringBuilder();
+        for(int i = 0; i!=passableBlocks.size(); i++){
+            passblocks.append(passableBlocks.get(i).name()+"=");
+        }
+        file_put_contents("passable_blocks.txt", passblocks.toString());
+    }
+
+    public void addPassBlock(){
 
     }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         new Thread(new Runnable() {
             @Override
             public void run() {
         try{
+
+            if(command.getName().equals("newPasBlock")) {
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду может выполнять только игрок!");
+                    return;
+                }
+
+                Player player = sender.getServer().getPlayer(sender.getName());
+                int maxDistance = 4; // Максимальная дистанция поиска блока
+                Block targetBlock = player.getTargetBlock(null, maxDistance); // Получаем блок, на который смотрит игрок
+                if (targetBlock != null) {
+                    Material material = targetBlock.getType(); // Получаем тип материала блока
+                    if(passableBlocks.contains(material)){
+                        sender.sendMessage("Блок: "+ material.name()+" - уже добавлен!");
+                    }else {
+                        passableBlocks.add(material);
+                        sender.sendMessage("Добавлен блок: " + material.name());
+                    }
+                } else {
+                    sender.sendMessage("Блок не найден!");
+                }
+
+            }
+            if(command.getName().equals("delPasBlock")) {
+                if(!(sender instanceof Player)) {
+                    sender.sendMessage("Эту команду может выполнять только игрок!");
+                    return;
+                }
+
+                Player player = sender.getServer().getPlayer(sender.getName());
+                int maxDistance = 4; // Максимальная дистанция поиска блока
+                Block targetBlock = player.getTargetBlock(null, maxDistance); // Получаем блок, на который смотрит игрок
+                if (targetBlock != null) {
+                    Material material = targetBlock.getType(); // Получаем тип материала блока
+                    passableBlocks.remove(material);
+                    sender.sendMessage("Блок: "+material.name()+ " - удален.");
+                } else {
+                    sender.sendMessage("Блок не найден!");
+                }
+
+            }
+            if(command.getName().equals("savePasBlocks")){
+                StringBuilder passblocks = new StringBuilder();
+                for(int i = 0; i!=passableBlocks.size(); i++){
+                    passblocks.append(passableBlocks.get(i).name()+"=");
+                }
+                file_put_contents("passable_blocks.txt", passblocks.toString());
+            }
 
         if(command.getName().equals("newSota")){
             if(!(sender instanceof Player)) {
@@ -335,58 +412,58 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
             }
 
-            if(command.getName().equalsIgnoreCase("newMark")) {
-                if (!sender.isOp()) {
-                    return;
-                }
-                if(!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                    return;
-                }
-                if(args.length < 2){
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/newMark <Группа> <Имя> <Комментарий>&r"));
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                            " &a&lГруппы(Можно так-же писать кастомые группы, &c&lглавное не засирать их!&r&a&l):&r" +
-                            "\n &l&nCity&r&e&l - Группа маркеров для городов.&r" +
-                            "\n &l&nVillage&r&e&l - Группа маркеров для сёл, и деревень.&r"));
-                    return;
-                }
-                int px = (int)((Player) sender).getPlayer().getLocation().getX();
-                int py = (int)((Player) sender).getPlayer().getLocation().getY();
-                int pz = (int)((Player) sender).getPlayer().getLocation().getZ();
-                int id = rand(-999999, 9999999);
-                StringBuilder comment = new StringBuilder();
-                for(int i = 2; i < args.length; i++) {
-                    comment.append(args[i]);
-                    comment.append(" ");
-                }
-                        if(
-                addMarker(String.valueOf(id), args[0], args[1], ((Player) sender).getPlayer().getWorld().getName(),
-                        px, py, pz, comment.toString()))
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                        "&a&lМаркер создан! ID Маркера: &n"+id+"&r"));
-                        else
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
-            }
+//            if(command.getName().equalsIgnoreCase("newMark")) {
+//                if (!sender.isOp()) {
+//                    return;
+//                }
+//                if(!(sender instanceof Player)) {
+//                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+//                    return;
+//                }
+//                if(args.length < 2){
+//                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+//                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/newMark <Группа> <Имя> <Комментарий>&r"));
+//                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+//                            " &a&lГруппы(Можно так-же писать кастомые группы, &c&lглавное не засирать их!&r&a&l):&r" +
+//                            "\n &l&nCity&r&e&l - Группа маркеров для городов.&r" +
+//                            "\n &l&nVillage&r&e&l - Группа маркеров для сёл, и деревень.&r"));
+//                    return;
+//                }
+//                int px = (int)((Player) sender).getPlayer().getLocation().getX();
+//                int py = (int)((Player) sender).getPlayer().getLocation().getY();
+//                int pz = (int)((Player) sender).getPlayer().getLocation().getZ();
+//                int id = rand(-999999, 9999999);
+//                StringBuilder comment = new StringBuilder();
+//                for(int i = 2; i < args.length; i++) {
+//                    comment.append(args[i]);
+//                    comment.append(" ");
+//                }
+//                        if(
+//                addMarker(String.valueOf(id), args[0], args[1], ((Player) sender).getPlayer().getWorld().getName(),
+//                        px, py, pz, comment.toString()))
+//                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+//                        "&a&lМаркер создан! ID Маркера: &n"+id+"&r"));
+//                        else
+//                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
+//            }
 
-            if(command.getName().equalsIgnoreCase("delMark")) {
-                if (!sender.isOp()) {
-                    return;
-                }
-                if(!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                    return;
-                }
-                if(args.length < 1){
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
-                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/delMark <Группа> <ID>&r"));
-                    return;
-                }
-                if(removeMarker(args[1], args[0]))
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lМаркер удален!&r"));
-                else sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
-            }
+//            if(command.getName().equalsIgnoreCase("delMark")) {
+//                if (!sender.isOp()) {
+//                    return;
+//                }
+//                if(!(sender instanceof Player)) {
+//                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
+//                    return;
+//                }
+//                if(args.length < 1){
+//                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"" +
+//                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/delMark <Группа> <ID>&r"));
+//                    return;
+//                }
+//                if(removeMarker(args[1], args[0]))
+//                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lМаркер удален!&r"));
+//                else sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&с&lПроизошла ошибка!&r"));
+//            }
 
             if(command.getName().equalsIgnoreCase("delPhone")) {
                 if(!(sender instanceof Player)) {
@@ -530,63 +607,63 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         return true;
     }
 
-    public boolean removeMarker(String id, String group)
-    {
-        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
-        boolean removed = false;
-        if (dynmap != null && dynmap.markerAPIInitialized())
-        {
-            MarkerAPI markers = dynmap.getMarkerAPI();
-            MarkerSet markerSet = markers.getMarkerSet(group);
-            if (markerSet != null) {
-                Marker marker = markerSet.findMarker(id);
-                if (marker != null) {
-                    removed = true;
-                    marker.deleteMarker();
-                }
-            }
-        }
-        return removed;
-    }
+//    public boolean removeMarker(String id, String group)
+//    {
+//        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
+//        boolean removed = false;
+//        if (dynmap != null && dynmap.markerAPIInitialized())
+//        {
+//            MarkerAPI markers = dynmap.getMarkerAPI();
+//            MarkerSet markerSet = markers.getMarkerSet(group);
+//            if (markerSet != null) {
+//                Marker marker = markerSet.findMarker(id);
+//                if (marker != null) {
+//                    removed = true;
+//                    marker.deleteMarker();
+//                }
+//            }
+//        }
+//        return removed;
+//    }
 
-    public boolean addMarker(String id, String group, String title, String world, int x, int y, int z, String description) {
-        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
-
-        String ico = "testico.png";
-        String icos = "testico";
-        if(group.equalsIgnoreCase("city")) ico = "cityico.png";
-        if(group.equalsIgnoreCase("city")) icos = "cityico";
-
-        if(group.equalsIgnoreCase("village")) ico = "village.png";
-        if(group.equalsIgnoreCase("village")) icos = "village";
-
-        boolean created = false;
-        if (dynmap != null && dynmap.markerAPIInitialized())
-        {
-            MarkerAPI markers = dynmap.getMarkerAPI();
-
-            MarkerSet markerSet = markers.getMarkerSet(group);
-            if (markerSet == null) {
-                markerSet = markers.createMarkerSet(group, group, null, true);
-            }
-            MarkerIcon wandIcon = markers.getMarkerIcon(icos);
-            if (wandIcon == null) {
-               wandIcon = markers.createMarkerIcon(icos, icos, getPlugin().getResource(ico));
-            }
-            Marker marker = markerSet.findMarker(id);
-            if (marker == null) {
-                created = true;
-                marker = markerSet.createMarker(id, title, world, x, y, z, wandIcon, true);
-            } else {
-                marker.setLocation(world, x, y, z);
-                marker.setLabel(title);
-            }
-            if (description != null) {
-                marker.setDescription(description);
-            }
-        }
-        return created;
-    }
+//    public boolean addMarker(String id, String group, String title, String world, int x, int y, int z, String description) {
+//        DynmapAPI dynmap = (DynmapAPI) Bukkit.getServer().getPluginManager().getPlugin("Dynmap");
+//
+//        String ico = "testico.png";
+//        String icos = "testico";
+//        if(group.equalsIgnoreCase("city")) ico = "cityico.png";
+//        if(group.equalsIgnoreCase("city")) icos = "cityico";
+//
+//        if(group.equalsIgnoreCase("village")) ico = "village.png";
+//        if(group.equalsIgnoreCase("village")) icos = "village";
+//
+//        boolean created = false;
+//        if (dynmap != null && dynmap.markerAPIInitialized())
+//        {
+//            MarkerAPI markers = dynmap.getMarkerAPI();
+//
+//            MarkerSet markerSet = markers.getMarkerSet(group);
+//            if (markerSet == null) {
+//                markerSet = markers.createMarkerSet(group, group, null, true);
+//            }
+//            MarkerIcon wandIcon = markers.getMarkerIcon(icos);
+//            if (wandIcon == null) {
+//               wandIcon = markers.createMarkerIcon(icos, icos, getPlugin().getResource(ico));
+//            }
+//            Marker marker = markerSet.findMarker(id);
+//            if (marker == null) {
+//                created = true;
+//                marker = markerSet.createMarker(id, title, world, x, y, z, wandIcon, true);
+//            } else {
+//                marker.setLocation(world, x, y, z);
+//                marker.setLabel(title);
+//            }
+//            if (description != null) {
+//                marker.setDescription(description);
+//            }
+//        }
+//        return created;
+//    }
 
     public ItemStack setTag(ItemStack is, String key, String val){
         NamespacedKey keyp = new NamespacedKey(getPlugin(), key);
@@ -616,45 +693,45 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onMove(PlayerMoveEvent e) {
-        Plugin pl = this;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int px = (int) e.getPlayer().getLocation().getX();
-                int py = (int) e.getPlayer().getLocation().getY();
-                int pz = (int) e.getPlayer().getLocation().getZ();
-                float p = (int) e.getPlayer().getLocation().getPitch();
-                if(pz < -18391) {
-                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
-                        public void run() {
-                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
-                                public void run() {
-                                    Location l = new Location(getServer().getWorld("World"), px, py, pz + 2);
-                                    l.setPitch(p);
-                                    l.setYaw(180);
-                                    e.getPlayer().teleport(l);
-                                }
-                            });
-                        }
-                    });
-                }
-                if(pz > 18391) {
-                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
-                        public void run() {
-                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
-                                public void run() {
-                                    Location l = new Location(getServer().getWorld("World"), px, py, pz - 2);
-                                    //l.setPitch(p);
-                                    l.setYaw(180);
-                                    e.getPlayer().teleport(l);
-                                }
-                            });
-                        }
-                    });
-                }
-                //9200
-            }
-        }).start();
+//        Plugin pl = this;
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                int px = (int) e.getPlayer().getLocation().getX();
+//                int py = (int) e.getPlayer().getLocation().getY();
+//                int pz = (int) e.getPlayer().getLocation().getZ();
+//                float p = (int) e.getPlayer().getLocation().getPitch();
+//                if(pz < -18391) {
+//                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+//                        public void run() {
+//                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+//                                public void run() {
+//                                    Location l = new Location(getServer().getWorld("World"), px, py, pz + 2);
+//                                    l.setPitch(p);
+//                                    l.setYaw(180);
+//                                    e.getPlayer().teleport(l);
+//                                }
+//                            });
+//                        }
+//                    });
+//                }
+//                if(pz > 18391) {
+//                    getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+//                        public void run() {
+//                            getServer().getScheduler().scheduleSyncDelayedTask(pl, new Runnable() {
+//                                public void run() {
+//                                    Location l = new Location(getServer().getWorld("World"), px, py, pz - 2);
+//                                    //l.setPitch(p);
+//                                    l.setYaw(180);
+//                                    e.getPlayer().teleport(l);
+//                                }
+//                            });
+//                        }
+//                    });
+//                }
+//                //9200
+//            }
+//        }).start();
     }
 
 
@@ -678,13 +755,13 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             @Override
             public void run() {
 
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                     //Бекапы
-                       // new Time(System.nanoTime());
-                    }
-                }).start();
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                     //Бекапы
+//                       // new Time(System.nanoTime());
+//                    }
+//                }).start();
 
                 if (!if_file_exs("Sotas/" + event.getPlayer().getName() + ".json")) {
                     plrSets[0].put("operator", "none");
@@ -706,8 +783,8 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
             }
         }).start();
-        final int[] ak = {1};
         final boolean[] a = {false};
+
         new Thread(new BukkitRunnable() {
             @Override
             public void run() {
@@ -724,11 +801,20 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
                 }).start();
 
-                    new Thread(new Runnable() {
+                if(!a[0]){
+                    runTaskTimerAsynchronously(getPlugin(), 1, 15L); a[0] = true;
+                    return;
+                }
+
+                if(!event.getPlayer().isOnline()){
+                    this.cancel();
+                    return;
+                }
+
+                new Thread(new Runnable() {
                     @Override
                     public void run() {
                         file_put_contents("Sotas/Sotas.json", Sotas.toString());
-
                         try {
                             if(!if_file_exs("Sotas/"+event.getPlayer().getName()+".json")){
                                 plrSets[0].put("operator", "none");
@@ -747,23 +833,22 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
                 }).start();
 
-                if(!a[0]){ runTaskTimerAsynchronously(getPlugin(), 1, 10L); a[0] = true;
-                    return;
-                }
-
-                if(!event.getPlayer().isOnline()){
-                    this.cancel();
-                    return;
-                }
-                for(int ib = 0; ib < Bossbars.length(); ib++) {
-                    try {
-                        BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
-                        bs.removeAll();
-                    }catch (Exception e){
-                        e.printStackTrace();
+                Thread bosbarClearthread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        for(int ib = 0; ib < Bossbars.length(); ib++) {
+                            try {
+                                BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
+                                bs.removeAll();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        Bossbars.clear();
                     }
-                }
-                Bossbars.clear();
+                });
+                bosbarClearthread.start();
+
                 int net = 0;
                 int maxnet = 5;
                 double[] netprec = new double[4];
@@ -775,6 +860,13 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     maxnet = Integer.parseInt(getTag(is, "mn"));
                     //net = Integer.parseInt(getTag(is, "mn")) - 1;
                 }
+
+                try {
+                    bosbarClearthread.join();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+
                 for(int i = 0; i < Sotas.length(); i++) {
                     try {
                         Sota sota;
@@ -786,7 +878,12 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         }catch (Exception e){
                             continue;
                         }
-                        double prec = SotaSignalPrecent(event.getPlayer(), sota);
+
+
+                        //Тут создается  prec
+                        double prec = 0;
+
+                        prec = SotaSignalPrecent(event.getPlayer(), sota);
                         if(prec <= 0){
                             continue;
                         }
@@ -887,49 +984,41 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         else{
                             if(plrSets[0].getBoolean("offradio")) continue;
                         }
+
                         BossBar bossBar = getServer().createBossBar(sota.Name+" ("+st+")", bc, BarStyle.SOLID, BarFlag.DARKEN_SKY);
                         double precforbs = prec / 100.0;
                         if(precforbs > 1.0) precforbs /= 100.0;
                         bossBar.setProgress(precforbs);
                         bossBar.addPlayer(event.getPlayer());
+
                         Bossbars.put(String.valueOf(Bossbars.length()),bossBar);
                     }catch (Exception e){
                         e.printStackTrace();
                     }
                 }
-                        if(bsnet != null) {
-                            if (bsnet.getTitle().equalsIgnoreCase("n")) return;
-                            if(netprec[net - 1] > 1.0) netprec[net - 1] = 1.0;
-                            bsnet.setProgress(netprec[net - 1]);
-                            //double precg = 0;
-                           // for(int i = 0; i != 4; i++) {
-                            //    if(netprec[i] < precg) precg = netprec[i];
-                            //}
-                            bsnet.addPlayer(event.getPlayer());
-                            Bossbars.put(String.valueOf(Bossbars.length()), bsnet);
-                        }
+                if(bsnet != null) {
+                    if (bsnet.getTitle().equalsIgnoreCase("n")) return;
+                    if(netprec[net - 1] > 1.0) netprec[net - 1] = 1.0;
+                    bsnet.setProgress(netprec[net - 1]);
+                    bsnet.addPlayer(event.getPlayer());
+                    Bossbars.put(String.valueOf(Bossbars.length()), bsnet);
+                }
 
-                BukkitRunnable b = this;
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if(ak[0] >= 20){
-                            b.cancel();
-                            for(int ib = 0; ib < Bossbars.length(); ib++) {
-                                try {
-                                    BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
-                                    bs.removeAll();
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                            if(event.getPlayer().isOnline()) onPlayerJoin(event);
-                            return;
-                        }
-                        ak[0] +=1;
-                    }
-                }).start();
-              //  event.getPlayer().sendMessage("Таймер");
+//                if(ak[0] >= 60){
+//                    this.cancel();
+//                    for(int ib = 0; ib < Bossbars.length(); ib++) {
+//                        try {
+//                            BossBar bs = (BossBar) Bossbars.get(String.valueOf(ib));
+//                            bs.removeAll();
+//                        } catch (Exception e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                    Bossbars.clear();
+//                    if(event.getPlayer().isOnline()) onPlayerJoin(event);
+//                    return;
+//                }
+//                ak[0] +=1;
             }
         }).start();
 
@@ -941,179 +1030,79 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     public void onPlayerQuit(PlayerQuitEvent evt) {
 
     }
-    void distance(PlayerJoinEvent pl, int x, int y, int z){
-        double distance = pl.getPlayer().getLocation().distance(new Location(pl.getPlayer().getWorld(), x,y,z));
-
-    }
     int distance(Player pl, Sota sota){
-        int x = sota.X;
-        int y = sota.Y;
-        int z = sota.Z;
-        double distance = pl.getLocation().distance(new Location(pl.getWorld(), x,y,z));
-
+        double distance = pl.getLocation().distance(new Location(pl.getWorld(), sota.X, sota.Y, sota.Z));
         return Math.toIntExact(Math.round(distance));
     }
     double SotaSignalPrecent(Player pl, Sota sota){
         int precent = 100;
-        //int nonprecent = 0;
-        //int px = (int) pl.getLocation().getX();
-        //int py = (int) pl.getLocation().getY();
-        //int pz = (int) pl.getLocation().getZ();
-        int maxDist = sota.getMaxDist();
         int dist = distance(pl, sota);
-        int res = maxDist - dist;
-        //py = sota.getMidHei(py);
-       // if(res <= 0){
-          //pl.sendMessage("Res:"+res);
-        //    return 0;
-      //  }
-        precent -= (int) ((dist * 6) / sota.Wats);
-        /*
-        int plrdi = getPlrDr(pl, sota);
-        pl.sendMessage("A1:"+py);
+        precent -= (int) ((dist * 4) / sota.Wats);
 
-        if(plrdi == 1) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px+=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }else
-        if(plrdi == 2) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px+=1;
-                pz+=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        else
-        if(plrdi == 3) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                pz+=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        else
-        if(plrdi == 4) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px-=1;
-                pz+=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        if(plrdi == 5) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px-=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        if(plrdi == 6) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px-=1;
-                pz-=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        if(plrdi == 7) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                pz-=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-        if(plrdi == 8) {
-            while (true) {
-                if (px == sota.X | py == sota.Y | pz == sota.Z) break;
-                px+=1;
-                pz-=1;
-                Material mat = getBlockType(px, py, pz);
-                if(mat != Material.AIR){
-                    nonprecent += MaterialsCustom.GetByMate(mat);
-                }else{
-                    nonprecent += 10;
-                }
-            }
-        }
-         */
-      //  pl.sendMessage("A2:"+precent);
         if(precent < 0) precent = 0;
-        return Double.parseDouble(precent+".0");
-    }
-    public int getPlrDr(Player player, Sota sota) {
-
-        Location loc1 = player.getLocation();
-
-        double dx = sota.X - loc1.getX();
-        double dz = sota.Z - loc1.getZ();
-
-        double angle = Math.atan2(dz, dx);
-        double degree = angle * 180 / Math.PI;
-        if (degree < 0) {
-            degree += 360;
+        else if(precent > 100) precent = 100;
+        else{
+            Location plloc = pl.getLocation();
+            plloc.setY(plloc.getBlockY());
+            Location end = new Location(pl.getWorld(), sota.X, sota.Y, sota.Z);
+            precent -= countBlocksOnPath(plloc, end);
         }
 
-        int direction = 0;
-
-        if (degree >= 337.5 || degree < 22.5) {
-            direction = 7;
-        } else if (degree >= 22.5 && degree < 67.5) {
-            direction = 8;
-        } else if (degree >= 67.5 && degree < 112.5) {
-            direction = 1;
-        } else if (degree >= 112.5 && degree < 157.5) {
-            direction = 2;
-        } else if (degree >= 157.5 && degree < 202.5) {
-            direction = 3;
-        } else if (degree >= 202.5 && degree < 247.5) {
-            direction = 4;
-        } else if (degree >= 247.5 && degree < 292.5) {
-            direction = 5;
-        } else if (degree >= 292.5 && degree < 337.5) {
-            direction = 6;
-        }
-
-        return direction;
+        return Double.parseDouble(precent +".0");
     }
 
+    public int countBlocksOnPath(Location start, Location end) {
+        World world = start.getWorld();
 
+        final int[] blockCount = {0};
+        int dx = Math.abs(end.getBlockX() - start.getBlockX());
+        int dy = Math.abs(end.getBlockY() - start.getBlockY());
+        int dz = Math.abs(end.getBlockZ() - start.getBlockZ());
+
+        int max = Math.max(Math.max(dx, dy), dz);
+        double dxStep = (double) dx / max;
+        double dyStep = (double) dy / max;
+        double dzStep = (double) dz / max;
+
+        double x = start.getBlockX();
+        double y = start.getBlockY();
+        double z = start.getBlockZ();
+        boolean thb = true;
+        for (int i = 0; i <= max; i++) {
+            //Для оптимизации
+            if(thb){
+                thb = false;
+                i++;
+            }else thb = true;
+
+            Block block = world.getBlockAt((int) Math.round(x), (int) Math.round(y), (int) Math.round(z));
+            if (block.getType() != org.bukkit.Material.AIR && block.getType() != Material.WATER && block.getType() != Material.LAVA && !passableBlocks.contains(block.getType())) {
+                float hrdns = block.getType().getHardness();
+                if(hrdns < 1) hrdns = 5;
+                if(hrdns > 100) hrdns = 50;
+                blockCount[0] += hrdns;
+                blockCount[0]++;
+            }
+
+            if (x < end.getBlockX()) {
+                x += dxStep;
+            } else if (x > end.getBlockX()) {
+                x -= dxStep;
+            }
+
+            if (y < end.getBlockY()) {
+                y += dyStep;
+            } else if (y > end.getBlockY()) {
+                y -= dyStep;
+            }
+
+            if (z < end.getBlockZ()) {
+                z += dzStep;
+            } else if (z > end.getBlockZ()) {
+                z -= dzStep;
+            }
+        }
+
+        return blockCount[0];
+    }
 }

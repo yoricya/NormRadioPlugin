@@ -3,6 +3,18 @@ version: '${project.version}'
 main: ru.yoricya.privat.sota.sotaandradio.SotaAndRadio
 api-version: 1.19
 commands:
+  delPasBlock:
+    description: Отметить блок как НЕ пропускающий сигнал
+    usage: /newPasBlock
+    permission: sotaradio.delPasBlock
+  newPasBlock:
+    description: Отметить блок как пропускающий сигнал
+    usage: /newPasBlock
+    permission: sotaradio.newPasBlock
+  savePasBlocks:
+    description: Сохранить PassBlocks список.
+    usage: /savePasBlocks
+    permission: sotaradio.newSota
   newSota:
     description: Новая сота
     usage: /newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>
