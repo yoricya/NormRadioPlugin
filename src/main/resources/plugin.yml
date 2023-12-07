@@ -6,67 +6,49 @@ commands:
   delPasBlock:
     description: Отметить блок как НЕ пропускающий сигнал
     usage: /newPasBlock
-    permission: sotaradio.delPasBlock
+    permission: sotaradio.delpasblock
   newPasBlock:
     description: Отметить блок как пропускающий сигнал
     usage: /newPasBlock
-    permission: sotaradio.newPasBlock
+    permission: sotaradio.newpasblock
   savePasBlocks:
     description: Сохранить PassBlocks список.
     usage: /savePasBlocks
-    permission: sotaradio.newSota
+    permission: sotaradio.newsota
   newSota:
     description: Новая сота
     usage: /newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>
-    permission: sotaradio.newSota
+    permission: sotaradio.newsota
   delSota:
     description: Удалить соту
     usage: /delSota <ID>
-    permission: sotaradio.delSota
+    permission: sotaradio.delsota
   nearSota:
     description: Соты поблизости
     usage: /nearSota
+    permission: sotaradio.nearsota
   userParams:
     description: Параметры Пользователя
     usage: /paramUser <Параметр> <Значение>
+    permission: sotaradio.userparams
   myOperator:
     description: Установить оператора
     usage: /myOperator <Имя>
+    permission: sotaradio.myoperator
   helpSota:
     description: Инфо
     usage: /helpSota
+    permission: sotaradio.helpsota
   setPhone:
     description: setPhone
     usage: /setPhone <Оператор> <Макс сеть> <Имя телефона>
+    permission: sotaradio.setphone
   infoPhone:
     description: infoPhone
     usage: /infoPhone
+    permission: sotaradio.infophone
   delPhone:
     description: delPhone
     usage: /delPhone
-  newMark:
-    description: New Marker
-    usage: /newMark
-  delMark:
-    description: Remove Marker
-    usage: /delMark
-  gm:
-    description: Gamemode
-    usage: /gm <Mode>
-  setHome:
-    description: Gamemode
-    usage: /gm <Mode>
-  tptoHome:
-    description: Gamemode
-    usage: /gm <Mode>
-  delHome:
-    description: Gamemode
-    usage: /gm <Mode>
-permissions:
-  sotaradio.*:
-    description: Все права
-  sotaradio.delSota:
-    description: Право на удаление соты
-  sotaradio.newSota:
-    description: Право на создание соты
+    permission: sotaradio.delphone
 

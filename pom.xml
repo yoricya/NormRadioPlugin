@@ -6,7 +6,7 @@
 
     <groupId>ru.yoricya.privat.sota</groupId>
     <artifactId>SotaAndRadio</artifactId>
-    <version>0.1</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <name>SotaAndRadio</name>
