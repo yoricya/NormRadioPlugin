@@ -7,6 +7,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Boss;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.SpawnCategory;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
@@ -41,6 +42,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     private static final List<Material> passableBlocks = new ArrayList<>();
     private static final ForkJoinPool ThreadPool = new ForkJoinPool();
     private final HashMap<Player, Thread> SotasHandlers = new HashMap<>();
+    private boolean isServerOverloaded = false;
     @Override
     public void onEnable() {
 
@@ -85,7 +87,13 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         if(!getServer().getOnlinePlayers().isEmpty()) for (Player player : getServer().getOnlinePlayers())
                 if(SotasHandlers.get(player) == null) onPlayerJoin(new PlayerJoinEvent(player, null));
 
-
+//        BukkitRunnable br = new BukkitRunnable() {
+//            @Override
+//            public void run() {
+//
+//            }
+//        };
+//        br.runTaskTimerAsynchronously(getPlugin(), 10L, 15L);
     }
 
     @Override
@@ -532,6 +540,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         final int[] cords = {0, 0, 0};
+        final int[] wotkingsteps = {0};
 
         final JSONObject[] plrSets = {new JSONObject()};
         final ConcurrentHashMap<Integer, BossBar> BSBMap = new ConcurrentHashMap<>();
@@ -840,12 +849,18 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             @Override
             public void run() {
                 while(!Thread.interrupted()) {
-                    int val = script.work();
-                    if (val == 0) LockSupport.parkNanos(100);
-                    if (val == 2) break;
+                    wotkingsteps[0]++;
+                    if(wotkingsteps[0] > 2048){
+                        onPlayerJoin(event);
+                        return;
+                    }
+
+                    if (script.work() == 2) return;
+                    LockSupport.parkNanos(200);
                 }
             }
         });
+
         handler.start();
         SotasHandlers.put(event.getPlayer(), handler);
     }
