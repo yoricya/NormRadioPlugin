@@ -21,8 +21,10 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.checker.units.qual.A;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,7 +43,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     public static Server Server;
     private static final List<Material> passableBlocks = new ArrayList<>();
     private static final ForkJoinPool ThreadPool = new ForkJoinPool();
-    private final HashMap<Player, Thread> SotasHandlers = new HashMap<>();
+    private final HashMap<String, BukkitRunnable> SotasHandlers = new HashMap<>();
     private boolean isServerOverloaded = false;
     @Override
     public void onEnable() {
@@ -52,10 +54,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 logger.log(Level.INFO, "Создаю конфиги...");
                 if(!if_dir_exs("Sotas"))
                     mkdir("Sotas");
-                if(!if_dir_exs("Sotas/BKP"))
-                    mkdir("Sotas/BKP");
-                if(!if_file_exs("Sotas/Sotas.json"))
-                    file_put_contents("Sotas/Sotas.json", "{}");
+                if(!if_dir_exs("Sotas"+File.separator+"BKP"))
+                    mkdir("Sota"+File.separator+"BKP");
+                if(!if_file_exs("Sotas"+File.separator+"Sotas.json"))
+                    file_put_contents("Sotas"+File.separator+"Sotas.json", "{}");
                 if(!if_file_exs("passable_blocks.txt"))
                     file_put_contents("passable_blocks.txt", Material.AIR.name()+"=");
                 logger.log(Level.INFO, "Создал конфиги.");
@@ -77,7 +79,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
             Server = this.getServer();
             logger.log(Level.INFO, "Загружаю список сот...");
-            Sotas = new JSONObject(file_get_contents("Sotas/Sotas.json"));
+            Sotas = new JSONObject(file_get_contents("Sotas"+File.separator+"Sotas.json"));
             logger.log(Level.INFO, "Загрузил список сот.");
         } catch (IOException e) {
             e.printStackTrace();
@@ -85,15 +87,16 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
 
         if(!getServer().getOnlinePlayers().isEmpty()) for (Player player : getServer().getOnlinePlayers())
-                if(SotasHandlers.get(player) == null) onPlayerJoin(new PlayerJoinEvent(player, null));
-
-//        BukkitRunnable br = new BukkitRunnable() {
-//            @Override
-//            public void run() {
-//
-//            }
-//        };
-//        br.runTaskTimerAsynchronously(getPlugin(), 10L, 15L);
+                if(SotasHandlers.get(player.getName()) == null) onPlayerJoin(new PlayerJoinEvent(player, null));
+        ThreadPool.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (SotasHandlers) {
+                    String filename = System.currentTimeMillis() + "bkp.json";
+                    file_put_contents("Sotas" + File.separator + "BKP" + File.separator + filename, Sotas.toString());
+                }
+            }
+        });
     }
 
     @Override
@@ -171,7 +174,17 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             Sotas.put(String.valueOf(Sotas.length()), sot.toString());
             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                     "&a&lСота создана! ID cоты:"+sot.id));
-           
+
+            ThreadPool.execute(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (SotasHandlers) {
+                        String filename = System.currentTimeMillis() + "bkp.json";
+                        file_put_contents("Sotas" + File.separator + "BKP" + File.separator + filename, Sotas.toString());
+                    }
+                }
+            });
+
                 return;
         }
         if(command.getName().equals("delSota")){
@@ -240,49 +253,49 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 return;
             }
             JSONObject plrSets = new JSONObject();
-            if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
+            if (!if_file_exs("Sotas"+File.separator+ sender.getName() + ".json")) {
                 plrSets.put("operator", "none");
                 plrSets.put("offmob", false);
                 plrSets.put("optest", true);
                 plrSets.put("offtv", false);
                 plrSets.put("offradio", false);
                 plrSets.put("offwifi", false);
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
             } else {
                 try {
-                    plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
+                    plrSets = new JSONObject(file_get_contents("Sotas"+File.separator+ sender.getName() + ".json"));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
             if (args[0].equalsIgnoreCase("OpTest")) {
                 plrSets.put("optest", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("Radio")) {
                 plrSets.put("offradio", args[1].equalsIgnoreCase("0"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("TV")) {
                 plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("WIFI")) {
                 plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("Mobile")) {
                 plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
                 return;
             } else if (args[0].equalsIgnoreCase("Operator")) {
                 plrSets.put("operator", args[1]);
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                file_put_contents("Sotas"+File.separator+ sender.getName() + ".json", plrSets.toString());
                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[1]));
                 return;
             }else{
@@ -548,7 +561,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         ThreadPool.execute(new Runnable() {
             @Override
             public void run() {
-                if (!if_file_exs("Sotas/" + event.getPlayer().getName() + ".json")) {
+                if (!if_file_exs("Sotas"+File.separator+ event.getPlayer().getName() + ".json")) {
                     plrSets[0].put("operator", "none");
                     plrSets[0].put("offmob", false);
                     plrSets[0].put("optest", true);
@@ -557,11 +570,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     plrSets[0].put("offwifi", false);
                     event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&',
                             "&a&lПривет! &e&lДля помощи по сотам используй &r&l&n/helpSota"));
-                    file_put_contents("Sotas/" + event.getPlayer().getName() + ".json", plrSets[0].toString());
+                    file_put_contents("Sotas"+File.separator+ event.getPlayer().getName() + ".json", plrSets[0].toString());
                 } else {
 
                     try {
-                        plrSets[0] = new JSONObject(file_get_contents("Sotas/" + event.getPlayer().getName() + ".json"));
+                        plrSets[0] = new JSONObject(file_get_contents("Sotas"+File.separator+ event.getPlayer().getName() + ".json"));
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -591,18 +604,18 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 ThreadPool.execute(new Runnable() {
                     @Override
                     public void run() {
-                        file_put_contents("Sotas/Sotas.json", Sotas.toString());
+                        file_put_contents("Sotas"+File.separator+"Sotas.json", Sotas.toString());
                         try {
-                            if(!if_file_exs("Sotas/"+event.getPlayer().getName()+".json")){
+                            if(!if_file_exs("Sotas"+File.separator+event.getPlayer().getName()+".json")){
                                 plrSets[0].put("operator", "none");
                                 plrSets[0].put("offmob", false);
                                 plrSets[0].put("optest", true);
                                 plrSets[0].put("offtv", false);
                                 plrSets[0].put("offradio", false);
                                 plrSets[0].put("offwifi", false);
-                                file_put_contents("Sotas/"+event.getPlayer().getName()+".json", plrSets[0].toString());
+                                file_put_contents("Sotas"+File.separator+event.getPlayer().getName()+".json", plrSets[0].toString());
                             }else{
-                                plrSets[0] = new JSONObject(file_get_contents("Sotas/"+event.getPlayer().getName()+".json"));
+                                plrSets[0] = new JSONObject(file_get_contents("Sotas"+File.separator+event.getPlayer().getName()+".json"));
                             }
                         }catch (Exception e){
                             e.printStackTrace();
@@ -844,28 +857,21 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             }
         };
 
-        //0 - Skip, 1 - OK, 2 - Stop
-        Thread handler = new Thread(new Runnable() {
+        BukkitRunnable br = new BukkitRunnable() {
             @Override
             public void run() {
-                while(!Thread.interrupted()) {
-                    wotkingsteps[0]++;
-                    if(wotkingsteps[0] > 2048){
-                        onPlayerJoin(event);
-                        return;
-                    }
-
-                    if (script.work() == 2) return;
-                    LockSupport.parkNanos(200);
+                //0 - Skip, 1 - OK, 2 - Stop
+                synchronized (script) {
+                    if(script.work() == 2) this.cancel();
                 }
             }
-        });
+        };
 
-        handler.start();
-        SotasHandlers.put(event.getPlayer(), handler);
+        br.runTaskTimerAsynchronously(getPlugin(), 0L, 15L);
+        SotasHandlers.put(event.getPlayer().getName(), br);
     }
 
-    public String networkGenParse(Object dat){
+    public static String networkGenParse(Object dat){
         if(dat instanceof Integer){
             int intDat = (Integer) dat;
             if(intDat == 1) return "GSM";
@@ -894,6 +900,35 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         return "Unknown";
     }
 
+    public static int networkIntGenParse(Object dat){
+        if(dat instanceof Integer){
+            int intDat = (Integer) dat;
+            if(intDat == 1) return 1;
+            if(intDat == 2) return 2;
+            if(intDat == 3) return 3;
+            if(intDat == 4) return 4;
+            if(intDat == 5) return 5;
+        }else if(dat instanceof String){
+            String strDat = (String) dat;
+            if(strDat.equals("1")) return 1;
+            if(strDat.equals("2")) return 2;
+            if(strDat.equals("3")) return 3;
+            if(strDat.equals("4")) return 4;
+            if(strDat.equals("GSM")) return 1;
+            if(strDat.equalsIgnoreCase("voice")) return 1;
+            if(strDat.equals("EDGE")) return 2;
+            if(strDat.equals("3G")) return 3;
+            if(strDat.equals("4G")) return 4;
+            if(strDat.equals("LTE")) return 4;
+            if(strDat.equals("UMTS")) return 3;
+            if(strDat.equals("HSPA")) return 3;
+            if(strDat.equals("5G")) return 5;
+            if(strDat.equalsIgnoreCase("internet")) return 4;
+        }
+
+        return 0;
+    }
+
     interface SotaWork{
         int work();
     }
@@ -903,7 +938,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     }
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent evt) {
-        SotasHandlers.remove(evt.getPlayer()).interrupt();
+        SotasHandlers.remove(evt.getPlayer().getName()).cancel();
     }
 
     int distance(Player pl, Sota sota){
@@ -917,6 +952,26 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         int precent = 100;
         int dist = distance(pl, sota);
         precent -= (int) ((dist * 4) / sota.Wats);
+
+        double freq = sota.getFrequency();
+        int addedPrecent = 0;
+        if(freq != -1){
+            long worldTime = pl.getWorld().getTime();
+            if(freq < 5){
+                if(worldTime > 13000){
+                    addedPrecent = 50;
+                    int dt = ((int) (18000 - worldTime) + 1) / 3;
+                    addedPrecent -= (int) (dt - (freq-1));
+                }
+            }
+        }
+        precent+=addedPrecent;
+
+        if(pl.getWorld().hasStorm())
+            precent -= rand(8, 12);
+
+        if(pl.getWorld().isThundering())
+            precent -= rand(16, 24);
 
         if(precent < 0) precent = 0;
         else if(precent > 100) precent = 100;

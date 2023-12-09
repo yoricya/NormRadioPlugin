@@ -4,6 +4,8 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.json.JSONObject;
 
+import static ru.yoricya.privat.sota.sotaandradio.SotaAndRadio.networkIntGenParse;
+
 public class Sota {
 
     public String Name;
@@ -32,6 +34,44 @@ public class Sota {
         Z = Integer.parseInt(sot[6]);
         id = Integer.parseInt(sot[7]);
     }
+
+    public double getFrequency(){
+        if(Type.equalsIgnoreCase("TV")) return 500;
+
+        if(Type.toLowerCase().contains("tv")){
+            try{
+                return Double.parseDouble(Type.toLowerCase().replace("tv", ""));
+            }catch (NumberFormatException e){
+                return 500;
+            }
+        }
+
+        if(Type.toLowerCase().contains("mhz")){
+            try{
+                return Double.parseDouble(Type.toLowerCase().replace("mhz", ""));
+            }catch (NumberFormatException e){
+                return 100;
+            }
+        }
+
+        if(networkIntGenParse(Type) == 1)
+            return 900;
+
+        if(networkIntGenParse(Type) == 2)
+            return 900;
+
+        if(networkIntGenParse(Type) == 3)
+            return 1900;
+
+        if(networkIntGenParse(Type) == 4)
+            return 2100;
+
+        if(networkIntGenParse(Type) == 5)
+            return 2100;
+
+        return -1;
+    }
+
     public String toString() {
         return Name+"_"+Type+"_"+Wats+"_"+Description+"_"+X+"_"+Y+"_"+Z+"_"+id;
     }
