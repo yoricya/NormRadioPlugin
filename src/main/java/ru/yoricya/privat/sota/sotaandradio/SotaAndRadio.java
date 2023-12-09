@@ -982,7 +982,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             precent -= countBlocksOnPath(plloc, end);
         }
 
-        return Double.parseDouble(precent +".0");
+        return precent;
     }
 
     public int countBlocksOnPath(Location start, Location end) {
