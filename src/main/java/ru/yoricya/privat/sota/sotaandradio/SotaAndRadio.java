@@ -42,6 +42,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     private static final List<Material> passableBlocks = new ArrayList<>();
     private static final ForkJoinPool ThreadPool = new ForkJoinPool();
     private final HashMap<Player, Thread> SotasHandlers = new HashMap<>();
+    private final int LoreVer = 2;
     private boolean isServerOverloaded = false;
     @Override
     public void onEnable() {
@@ -110,407 +111,341 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         ThreadPool.execute(new Runnable() {
             @Override
             public void run() {
-        try{
-
-            if(command.getName().equals("newPasBlock")) {
-                if(!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду может выполнять только игрок!");
+                if(!command.testPermission(sender)) {
+                    sender.sendMessage("No permission!");
                     return;
                 }
+                try{
 
-                Player player = (Player) sender;
-                Material material = player.getTargetBlock(null, 4).getType(); // Получаем тип материала блока
-                if(passableBlocks.contains(material))
-                    sender.sendMessage("Блок: "+ material.name()+" - уже добавлен!");
-                else {
-                    passableBlocks.add(material);
-                    sender.sendMessage("Добавлен блок: " + material.name());
-                }
+                    if(command.getName().equals("newPasBlock")) {
+                        if(!(sender instanceof Player)) {
+                            sender.sendMessage("Эту команду может выполнять только игрок!");
+                            return;
+                        }
 
-            }
-            if(command.getName().equals("delPasBlock")) {
-                if(!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду может выполнять только игрок!");
-                    return;
-                }
-
-                Player player = (Player) sender;
-                Material material = player.getTargetBlock(null, 4).getType(); // Получаем тип материала блока
-                passableBlocks.remove(material);
-                sender.sendMessage("Блок: "+material.name()+ " - удален.");
-            }
-            if(command.getName().equals("savePasBlocks")){
-                StringBuilder passblocks = new StringBuilder();
-                for(int i = 0; i != passableBlocks.size(); i++){
-                    passblocks.append(passableBlocks.get(i).name()).append("=");
-                }
-                file_put_contents("passable_blocks.txt", passblocks.toString());
-            }
-
-        if(command.getName().equals("newSota")){
-            if(!(sender instanceof Player)) {
-                sender.sendMessage("Эту команду может выполнять только игрок!");
-                return;
-            }
-            if(args.length < 4){
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТипы сети:&r" +
-                        "\n &r&l&nwifi&r&l - Wi-Fi сеть." +
-                        "\n &r&l&ngsm&r&l - GSM (2G) сеть." +
-                        "\n &r&l&nedge&r&l - EDGE (2G) сеть."+
-                        "\n &r&l&n3g&r&l - 3G (3G) сеть."+
-                        "\n &r&l&n4g&r&l - 4G (4G) сеть."+
-                        "\n &r&lЛибо укажите частоту: &n'101.2FM'&r"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&e&l/newSota <Имя> <Частота или Тип> <Мощность в ваттах, пример: '1.0'> <Коментарий, по умолчанию: 'n'>"));
-                return;
-            }
-            Sota sot =  new Sota();
-            sot.newSota(((Player) sender) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
-            sot.id = Sotas.length();
-            Sotas.put(String.valueOf(Sotas.length()), sot.toString());
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&a&lСота создана! ID cоты:"+sot.id));
-           
-                return;
-        }
-        if(command.getName().equals("delSota")){
-            if(args.length < 1){
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
-                sender.sendMessage("/delSota <Имя>");
-                return;
-            }
-            Sota sot = new Sota(Sotas.getString(args[0]));
-            sot.Description = "OFF";
-            Sotas.put(String.valueOf(args[0]), sot.toString());
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lСота удалена!"));
-           
-                return;
-        }
-        if(command.getName().equals("nearSota")){
-            if(!(sender instanceof Player)) {
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lЭту команду можно выполнять только от игрока!"));
-                return;
-            }
-            Sota sot = new Sota();
-            int dist = 1000;
-            for(int i = 0; i < Sotas.length(); i++) {
-                    Sota sotv = new Sota(Sotas.getString(String.valueOf(i)));
-                    if(sotv.Description.equals("OFF")){
-                        continue;
+                    Player player = (Player) sender;
+                    Material material = player.getTargetBlock(null, 4).getType(); // Получаем тип материала блока
+                    if(passableBlocks.contains(material))
+                        sender.sendMessage("Блок: "+ material.name()+" - уже добавлен!");
+                    else {
+                        passableBlocks.add(material);
+                        sender.sendMessage("Добавлен блок: " + material.name());
                     }
-                    int g = distance(((Player) sender), sotv);
-                    if (g <= dist) {
-                        dist = g;
-                        sot = sotv;
-                    }
-            }
-            if(sot.Name == null){
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lБлижайших к вам сот не обнаружено!"));
-                return;
-            }
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&a&lБлижайшая к вам сота, ID: &n("+sot.id+")&r&l," +
-                    "\n &lИмя: &n("+sot.Name+")&r&l," +
-                    "\n &lТип: &n("+sot.Type+")&r&l," +
-                    "\n &lМощность: &n("+sot.Wats+")&r&l," +
-                    "\n &lКомментарий к соте: &n("+sot.Description+")&r&l," +
-                    "\n &lРасстояние: &n("+distance(((Player) sender), sot)+")&r&l."));
-           
-                return;
-        }
 
-
-        if(command.getName().equals("userParams")) {
-            if(!(sender instanceof Player)) {
-                sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                return;
-            }
-            if (args.length < 2) {
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&l&nOpTest <1/0>&r&l (Проверять ли соты на соответствие оператора?)" +
-                        "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
-                        "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
-                        "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
-                        "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
-                        "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
-               
-                return;
-            }
-            JSONObject plrSets = new JSONObject();
-            if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
-                plrSets.put("operator", "none");
-                plrSets.put("offmob", false);
-                plrSets.put("optest", true);
-                plrSets.put("offtv", false);
-                plrSets.put("offradio", false);
-                plrSets.put("offwifi", false);
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-            } else {
-                try {
-                    plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
-                } catch (IOException e) {
-                    e.printStackTrace();
                 }
-            }
-            if (args[0].equalsIgnoreCase("OpTest")) {
-                plrSets.put("optest", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
-                return;
-            } else if (args[0].equalsIgnoreCase("Radio")) {
-                plrSets.put("offradio", args[1].equalsIgnoreCase("0"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
-                return;
-            } else if (args[0].equalsIgnoreCase("TV")) {
-                plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
-                return;
-            } else if (args[0].equalsIgnoreCase("WIFI")) {
-                plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
-                return;
-            } else if (args[0].equalsIgnoreCase("Mobile")) {
-                plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
-                return;
-            } else if (args[0].equalsIgnoreCase("Operator")) {
-                plrSets.put("operator", args[1]);
-                file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[1]));
-                return;
-            }else{
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
-                        "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
-                        "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
-                        "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
-                        "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
-                        "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
-
-            }
-        }
-
-        if(command.getName().equalsIgnoreCase("myOperator")) {
-            if(!(sender instanceof Player)) {
-                sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                return;
-            }
-            if(args.length == 0){
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/myOperator <Имя Оператора>"));
-                return;
-            }
-            ItemStack is = ((Player) sender).getItemInHand();
-            ItemMeta im = is.getItemMeta();
-            is.setItemMeta(im);
-            setTag(is, "op", args[0]);
-            ((Player) sender).setItemInHand(is);
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь телефон привязан к оператору: &n"+args[0]));
-            return;
-        }
-
-        if(command.getName().equalsIgnoreCase("helpSota")) {
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&a&l&n/helpSota&r&a&l - Показать этот список,"));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &l&n/myOperator <Имя>&r&l - Установить оператора."));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    " &l&n/userParam&r&l - Настройка параметров пользователя."));
-            if (sender.isOp()) {
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/newSota&r&l - Создать новую соту."));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/delSota&r&l - Удалить соту"));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/nearSota&r&l - Найти ближайшую соту."));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/setPhone&r&l - Создать новый телефон."));
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/delPhone&r&l - Деактивировать телефон."));
-            }
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/infoPhone&r&l - Информация о телефоне."));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
-            sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
-        }
-
-            if(command.getName().equalsIgnoreCase("setPhone")) {
-                if(!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                    return;
-                }
-                if (sender.isOp()) {
-                    if(args.length < 2){
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/setPhone <Имя Оператора, по умолчанию: 'n'> <Максимально поддерживаемая сеть> <Имя телефона>"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                " &lИмя Оператора можно не указывать, Вместо него вставьте букву &n'n'&r"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                " &a&lВ имени телефона поддерживаются управляющие символы '&n&'&r&a&l которые делают текст цветным! &c&lНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                "\n &c&lНБТ Теги телефона наложатся на предмет в вашей руке!"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                "&lВсе типы сетей:" +
-                                "\n &r&n&l1&r&l - &lGSM Только связь и смски. &a&l(Относится к сетям 2G)" +
-                                "\n &n&l2&r&l - &lEDGE Связь и слабый интернет. &a&l(Относится к сетям 2G)" +
-                                "\n &n&l3&r&l - &l3G Связь и интернет средней скорости. &a&l(Относится к сетям 3G)" +
-                                "\n &n&l4&r&l - &l4G Только быстрый интернет. &a&l(Относится к сетям 4G)"));
+                if(command.getName().equals("delPasBlock")) {
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду может выполнять только игрок!");
                         return;
                     }
 
+                    Player player = (Player) sender;
+                    Material material = player.getTargetBlock(null, 4).getType(); // Получаем тип материала блока
+                    passableBlocks.remove(material);
+                    sender.sendMessage("Блок: "+material.name()+ " - удален.");
+                }
+                if(command.getName().equals("savePasBlocks")){
+                    StringBuilder passblocks = new StringBuilder();
+                    for(int i = 0; i != passableBlocks.size(); i++){
+                        passblocks.append(passableBlocks.get(i).name()).append("=");
+                    }
+                    file_put_contents("passable_blocks.txt", passblocks.toString());
+                }
+
+                if(command.getName().equals("newSota")){
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду может выполнять только игрок!");
+                        return;
+                    }
+                    if(args.length < 4){
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТипы сети:&r" +
+                                "\n &r&l&nwifi&r&l - Wi-Fi сеть." +
+                                "\n &r&l&ngsm&r&l - GSM (2G) сеть." +
+                                "\n &r&l&nedge&r&l - EDGE (2G) сеть."+
+                                "\n &r&l&n3g&r&l - 3G (3G) сеть."+
+                                "\n &r&l&n4g&r&l - 4G (4G) сеть."+
+                                "\n &r&lЛибо укажите частоту: &n'101.2FM'&r"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&e&l/newSota <Имя> <Частота или Тип> <Мощность в ваттах, пример: '1.0'> <Коментарий, по умолчанию: 'n'>"));
+                        return;
+                    }
+                    Sota sot =  new Sota();
+                    sot.newSota(((Player) sender) ,args[0], args[1], Float.valueOf(args[2]), args[3]);
+                    sot.id = Sotas.length();
+                    Sotas.put(String.valueOf(Sotas.length()), sot.toString());
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                        "&a&lСота создана! ID cоты:"+sot.id));
+           
+                    return;
+                }
+                if(command.getName().equals("delSota")){
+                    if(args.length < 1){
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lНе все арги указаны!"));
+                        sender.sendMessage("/delSota <Имя>");
+                       return;
+                    }
+                    Sota sot = new Sota(Sotas.getString(args[0]));
+                    sot.Description = "OFF";
+                    Sotas.put(String.valueOf(args[0]), sot.toString());
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&e&lСота удалена!"));
+           
+                    return;
+                }
+                if(command.getName().equals("nearSota")){
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lЭту команду можно выполнять только от игрока!"));
+                        return;
+                    }
+                    Sota sot = new Sota();
+                    int dist = 1000;
+                    for(int i = 0; i < Sotas.length(); i++) {
+                            Sota sotv = new Sota(Sotas.getString(String.valueOf(i)));
+                            if(sotv.Description.equals("OFF")){
+                                continue;
+                            }
+                            int g = distance(((Player) sender), sotv);
+                            if (g <= dist) {
+                                dist = g;
+                                sot = sotv;
+                            }
+                    }
+                    if(sot.Name == null){
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lБлижайших к вам сот не обнаружено!"));
+                        return;
+                    }
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                        "&a&lБлижайшая к вам сота, ID: &n("+sot.id+")&r&l," +
+                        "\n &lИмя: &n("+sot.Name+")&r&l," +
+                        "\n &lТип: &n("+sot.Type+")&r&l," +
+                        "\n &lМощность: &n("+sot.Wats+")&r&l," +
+                        "\n &lКомментарий к соте: &n("+sot.Description+")&r&l," +
+                        "\n &lРасстояние: &n("+distance(((Player) sender), sot)+")&r&l."));
+           
+                    return;
+                }
+                if(command.getName().equals("userParams")) {
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                        return;
+                    }
+                    if (args.length < 2) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                            "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&l&nOpTest <1/0>&r&l (Проверять ли соты на соответствие оператора?)" +
+                                "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
+                                "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                                "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
+                                "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                                "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+               
+                        return;
+                    }
+                    JSONObject plrSets = new JSONObject();
+                    if (!if_file_exs("Sotas/" + sender.getName() + ".json")) {
+                        plrSets.put("operator", "none");
+                        plrSets.put("offmob", false);
+                        plrSets.put("optest", true);
+                        plrSets.put("offtv", false);
+                        plrSets.put("offradio", false);
+                        plrSets.put("offwifi", false);
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                    } else {
+                        try {
+                            plrSets = new JSONObject(file_get_contents("Sotas/" + sender.getName() + ".json"));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    if (args[0].equalsIgnoreCase("OpTest")) {
+                        plrSets.put("optest", args[1].equalsIgnoreCase("1"));
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
+                        return;
+                    } else if (args[0].equalsIgnoreCase("Radio")) {
+                        plrSets.put("offradio", args[1].equalsIgnoreCase("0"));
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
+                        return;
+                    } else if (args[0].equalsIgnoreCase("TV")) {
+                        plrSets.put("offtv", args[1].equalsIgnoreCase("1"));
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
+                        return;
+                    } else if (args[0].equalsIgnoreCase("WIFI")) {
+                        plrSets.put("offwifi", args[1].equalsIgnoreCase("1"));
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
+                        return;
+                    } else if (args[0].equalsIgnoreCase("Mobile")) {
+                        plrSets.put("offmob", args[1].equalsIgnoreCase("1"));
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lПараметр изменен"));
+                        return;
+                    } else if (args[0].equalsIgnoreCase("Operator")) {
+                        plrSets.put("operator", args[1]);
+                        file_put_contents("Sotas/" + sender.getName() + ".json", plrSets.toString());
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь ваш оператор: &n"+args[1]));
+                        return;
+                    }else{
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&l&nOperatorTest <1/0>&r&l (Проверять ли соты на соответствие оператора)" +
+                                        "\n &l&nOperator <Имя>&r&l (Установить оператора)" +
+                                        "\n &l&nRadio <1/0>&r&l (Включить отображение радиостанций)" +
+                                        "\n &l&nTV <1/0>&r&l (Включить отображение TV)" +
+                                        "\n &l&nWIFI <1/0>&r&l (Включить отображение WIFI)" +
+                                        "\n &l&nMOBILE <1/0>&r&l (Включить отображение Мобильных Сетей)"));
+
+                    }
+                }
+
+                if(command.getName().equalsIgnoreCase("myOperator")) {
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                        return;
+                    }
+                    if(args.length == 0){
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/myOperator <Имя Оператора>"));
+                        return;
+                    }
                     ItemStack is = ((Player) sender).getItemInHand();
                     ItemMeta im = is.getItemMeta();
-
-
-                    String sim = args[0];
-                    if(args[0].equals("n")) sim = "Без ограничений";
-
-                    Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', args[2]));
-
-                    List<String> phoneLore = new ArrayList<>();
-                    phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7Network-Gen: " +
-                            networkGenParse(args[1])));
-                    phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7SIM: "+sim));
-
-                    im.setLore(phoneLore);
-
                     is.setItemMeta(im);
-
-                    setTag(is, "ph", "1");
                     setTag(is, "op", args[0]);
-                    setTag(is, "mn", args[1]);
-
                     ((Player) sender).setItemInHand(is);
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
-                } else {
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lУ вас нет прав для использования этой команды!"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lТеперь телефон привязан к оператору: &n"+args[0]));
                     return;
                 }
-            }
 
-            if(command.getName().equalsIgnoreCase("delPhone")) {
-                if (!(sender instanceof Player)) {
-                    sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                    return;
+                if(command.getName().equalsIgnoreCase("helpSota")) {
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                            "&a&l&n/helpSota&r&a&l - Показать этот список,"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &l&n/myOperator <Имя>&r&l - Установить оператора."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                            " &l&n/userParam&r&l - Настройка параметров пользователя."));
+                    if (sender.isOp()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/newSota&r&l - Создать новую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/delSota&r&l - Удалить соту"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &6&l&n/nearSota&r&l - Найти ближайшую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/setPhone&r&l - Создать новый телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/delPhone&r&l - Деактивировать телефон."));
+                    }
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &9&l&n/infoPhone&r&l - Информация о телефоне."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&'," &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
                 }
-                if (sender.isOp()) {
-                    ItemStack is = ((Player) sender).getItemInHand();
-                    ItemMeta im = is.getItemMeta();
-                    Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', "&c&l(Telephone Deactivated!)"));
-                    is.setItemMeta(im);
-                    setTag(is, "ph", "0");
-                    ((Player) sender).setItemInHand(is);
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lГотово!"));
-                } else {
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lУ вас нет прав для использования этой команды!"));
-                    return;
-                }
-            }
 
-            if(command.getName().equalsIgnoreCase("gm")) {
-                if (!sender.isOp()) {
-                    return;
-                }
-                if(args.length < 1){
-                    if(!(sender instanceof Player)) {
-                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                        return;
-                    }
-                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
-                        public void run() {
-                    if(((Player) sender).getGameMode() == GameMode.CREATIVE){
-                        ((Player) sender).setGameMode(GameMode.SURVIVAL);
-                    }else if(((Player) sender).getGameMode() == GameMode.SURVIVAL){
-                        ((Player) sender).setGameMode(GameMode.CREATIVE);
-                    }else{
-                        ((Player) sender).setGameMode(GameMode.CREATIVE);
-                    }
+                    if(command.getName().equalsIgnoreCase("setPhone")) {
+                        if(!(sender instanceof Player)) {
+                            sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                            return;
                         }
-                    });
-                }else  if(args.length > 1){
-                    Player pl = getServer().getPlayer(args[1]);
-                    if(pl == null){
-                        sender.sendMessage("Игрок не найден!");
-                        return;
-                    }
-                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
-                        public void run() {
-                            if(args[0].equalsIgnoreCase("0")){
-                                pl.setGameMode(GameMode.SURVIVAL);
-                            }else
-                            if(args[0].equalsIgnoreCase("1")){
-                                pl.setGameMode(GameMode.CREATIVE);
-                            }else
-                            if(args[0].equalsIgnoreCase("2")){
-                                pl.setGameMode(GameMode.ADVENTURE);
-                            }else
-                            if(args[0].equalsIgnoreCase("3")){
-                                pl.setGameMode(GameMode.SPECTATOR);
+                        if (sender.isOp()) {
+                            if(args.length < 2){
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды: &n/setPhone <Имя Оператора, по умолчанию: 'n'> <Максимально поддерживаемая сеть> <Имя телефона>"));
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        " &lИмя Оператора можно не указывать, Вместо него вставьте букву &n'n'&r"));
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                     " &a&lВ имени телефона поддерживаются управляющие символы '&n&'&r&a&l которые делают текст цветным! &c&lНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                     "\n &c&lНБТ Теги телефона наложатся на предмет в вашей руке!"));
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        "&lВсе типы сетей:" +
+                                        "\n &r&n&l1&r&l - &lGSM Только связь и смски. &a&l(Относится к сетям 2G)" +
+                                        "\n &n&l2&r&l - &lEDGE Связь и слабый интернет. &a&l(Относится к сетям 2G)" +
+                                        "\n &n&l3&r&l - &l3G Связь и интернет средней скорости. &a&l(Относится к сетям 3G)" +
+                                        "\n &n&l4&r&l - &l4G Только быстрый интернет. &a&l(Относится к сетям 4G)"));
+                                return;
                             }
-                            else{
-                                pl.setGameMode(GameMode.SURVIVAL);
-                            }
-                            pl.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&lВаш режим игры изменен игроком: &n"+sender.getName()+"&r"));
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&lРежим игры игрока: &n"+pl.getName()+"&r&l Успешно изменен!"));
+
+                            ItemStack is = ((Player) sender).getItemInHand();
+                            ItemMeta im = is.getItemMeta();
+
+                            String sim = args[0];
+                            if(args[0].equals("n")) sim = "Без ограничений";
+
+                            Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', args[2]));
+
+                            List<String> phoneLore = new ArrayList<>();
+                            phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7Network-Gen: " +
+                                    networkGenParse(args[1])));
+                            phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7SIM: "+sim));
+
+                            im.setLore(phoneLore);
+
+                            is.setItemMeta(im);
+
+                            //Set is Phone
+                            setTag(is, "ph", "1");
+
+                            //Set operator
+                            setTag(is, "op", args[0]);
+
+                            //Set max net gen
+                            setTag(is, "mn", args[1]);
+
+                            //Set Lore Version
+                            setTag(is, "lv", LoreVer+"");
+
+                            ((Player) sender).setItemInHand(is);
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&a&lГотово!"));
+                        } else {
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lУ вас нет прав для использования этой команды!"));
+                            return;
                         }
-                    });
-                }
-                else{
-                    if(!(sender instanceof Player)) {
-                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
-                        return;
-                    }
-                    getServer().getScheduler().scheduleSyncDelayedTask(getPlugin(), new Runnable() {
-                        public void run() {
-                    if(args[0].equalsIgnoreCase("0")){
-                        ((Player) sender).setGameMode(GameMode.SURVIVAL);
-                    }else
-                    if(args[0].equalsIgnoreCase("1")){
-                        ((Player) sender).setGameMode(GameMode.CREATIVE);
-                    }else
-                    if(args[0].equalsIgnoreCase("2")){
-                        ((Player) sender).setGameMode(GameMode.ADVENTURE);
-                    }else
-                    if(args[0].equalsIgnoreCase("3")){
-                        ((Player) sender).setGameMode(GameMode.SPECTATOR);
                     }
 
-                }
-            });
-                }
-            }
+                    if(command.getName().equalsIgnoreCase("delPhone")) {
+                        if (!(sender instanceof Player)) {
+                            sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                            return;
+                        }
+                        if (sender.isOp()) {
+                            ItemStack is = ((Player) sender).getItemInHand();
+                            ItemMeta im = is.getItemMeta();
+                            Objects.requireNonNull(im).setDisplayName(ChatColor.translateAlternateColorCodes('&', "&c&l(Telephone Deactivated!)"));
+                            is.setItemMeta(im);
+                            setTag(is, "ph", "0");
+                            ((Player) sender).setItemInHand(is);
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lГотово!"));
+                        } else {
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lУ вас нет прав для использования этой команды!"));
+                            return;
+                        }
+                    }
 
-            if(command.getName().equalsIgnoreCase("infoPhone")) {
-                ItemStack is = ((Player) sender).getItemInHand();
-                String v = "Нет";
-                String net = "Нет";
-                if(!getTag(is, "op").equalsIgnoreCase("n")){
-                    v = getTag(is, "op");
-                }
-                if(getTag(is, "mn").equalsIgnoreCase("1")){
-                    net = "GSM (2G)";
-                }else if(getTag(is, "mn").equalsIgnoreCase("2")){
-                    net = "EDGE (2G)";
-                }else if(getTag(is, "mn").equalsIgnoreCase("3")){
-                    net = "3G (3G)";
-                }else if(getTag(is, "mn").equalsIgnoreCase("4")){
-                    net = "4G (4G)";
-                }
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                        "&a&lИнформация о телефоне:" +
-                        "\n &r&lПривязка к оператору: &n"  +v+"&r"+
-                        "\n &lПоддержка сетей: &n" +net+"&r"));
-            }
+                    if(command.getName().equalsIgnoreCase("infoPhone")) {
+                        ItemStack is = ((Player) sender).getItemInHand();
+                        String v = "Нет";
+                        String net = "Нет";
+                        if(!getTag(is, "op").equalsIgnoreCase("n")){
+                            v = getTag(is, "op");
+                        }
+                        if(getTag(is, "mn").equalsIgnoreCase("1")){
+                            net = "GSM (2G)";
+                        }else if(getTag(is, "mn").equalsIgnoreCase("2")){
+                            net = "EDGE (2G)";
+                        }else if(getTag(is, "mn").equalsIgnoreCase("3")){
+                            net = "3G (3G)";
+                        }else if(getTag(is, "mn").equalsIgnoreCase("4")){
+                            net = "4G (4G)";
+                        }
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&a&lИнформация о телефоне:" +
+                                        "\n &r&lПривязка к оператору: &n"  +v+"&r"+
+                                        "\n &lПоддержка сетей: &n" +net+"&r"));
+                    }
 
-        }catch (Exception e){
-          e.printStackTrace();
-          sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lПроизошла ошибка!"));
-        }
+                }catch (Exception e){
+                  e.printStackTrace();
+                  sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&c&lПроизошла ошибка!"));
+                }
             }
         });
         return true;
@@ -535,6 +470,41 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
             foundValue = container.get(keyp, PersistentDataType.STRING);
         }
         return foundValue;
+    }
+
+    private final HashMap<ItemStack, Boolean> CheckedItem = new HashMap<>();
+    public ItemStack CheckAndFixPhone(ItemStack is){
+        if(CheckedItem.putIfAbsent(is, true) != null) return is;
+
+        ItemMeta im = is.getItemMeta();
+        String lvd = getTag(is, "lv");
+
+        boolean isLoreNeedFix = false;
+        if(lvd.isEmpty()) {
+            setTag(is, "lv", LoreVer + "");
+            isLoreNeedFix = true;
+        }else if(Integer.parseInt(lvd) < LoreVer)
+            isLoreNeedFix = true;
+
+        if(isLoreNeedFix){
+            String Operator = getTag(is, "op");
+            if(Operator.isEmpty()) Operator = "N/A";
+            else if(Operator.equals("n")) Operator = "Без ограничений";
+
+            String MaxNet = getTag(is, "mn");
+            if(MaxNet.isEmpty()) MaxNet = "N/A";
+
+            List<String> phoneLore = new ArrayList<>();
+            phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7Network-Gen: "+Operator));
+            phoneLore.add(ChatColor.translateAlternateColorCodes('&', "&7SIM: "+MaxNet));
+
+            im.setLore(phoneLore);
+            is.setItemMeta(im);
+
+            //Set Lore Version
+            setTag(is, "lv", LoreVer+"");
+        }
+        return is;
     }
 
     @EventHandler
@@ -573,6 +543,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         SotaWork script = new SotaWork() {
             @Override
             public int work() {
+                if(!event.getPlayer().isOnline()) return 2;
                 if(cords[0] == (int) event.getPlayer().getLocation().getX() &&
                         cords[1] == (int) event.getPlayer().getLocation().getY() &&
                         cords[2] == (int) event.getPlayer().getLocation().getZ()) return 0;
@@ -585,8 +556,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         cords[2] = (int) event.getPlayer().getLocation().getZ();
                     }
                 });
-
-                if(!event.getPlayer().isOnline()) return 2;
 
                 ThreadPool.execute(new Runnable() {
                     @Override
@@ -625,15 +594,21 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 String currentoperator = plrSets[0].getString("operator");
-
                 String phoneOptag = getTag(is, "op");
 
                 if(!phoneOptag.equals("n")) currentoperator = phoneOptag;
 
                 int maxnet = Integer.parseInt(getTag(is, "mn"));
 
-                ConcurrentHashMap<Integer, BossBar> BossbarsForAdd = new ConcurrentHashMap<>();
+                //Check And Fix Phone if needed
+                ThreadPool.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        CheckAndFixPhone(is);
+                    }
+                });
 
+                ConcurrentHashMap<Integer, BossBar> BossbarsForAdd = new ConcurrentHashMap<>();
                 int i = -1;
                 while(i < Sotas.length()) {
                     i++;
@@ -814,28 +789,30 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     ThreadPool.execute(new Runnable() {
                         @Override
                         public void run() {
-                            try {
+                            synchronized (BSBMap){
+                                try {
 
-                                if(finalBsnet.getTitle().equals("n")){
-                                    finalBsnet.setTitle(ChatColor.translateAlternateColorCodes('&',"&7[Phone] Нет сети"));
-                                    finalBsnet.setColor(BarColor.WHITE);
-                                    finalBsnet.setProgress(0);
-                                    finalBsnet.setStyle(BarStyle.SEGMENTED_6);
-                                }else{
-                                    if (netprec[finalNet - 1] > 1.0) netprec[finalNet - 1] = 1.0;
-                                    finalBsnet.setProgress(netprec[finalNet - 1]);
-                                }
+                                    if(finalBsnet.getTitle().equals("n")){
+                                        finalBsnet.setTitle(ChatColor.translateAlternateColorCodes('&',"&7[Phone] Нет сети"));
+                                        finalBsnet.setColor(BarColor.WHITE);
+                                        finalBsnet.setProgress(0);
+                                        finalBsnet.setStyle(BarStyle.SEGMENTED_6);
+                                    }else{
+                                        if (netprec[finalNet - 1] > 1.0) netprec[finalNet - 1] = 1.0;
+                                        finalBsnet.setProgress(netprec[finalNet - 1]);
+                                    }
 
-                                BossBar bs = BSBMap.get(-900);
-                                if(bs == null){
-                                    finalBsnet.addPlayer(event.getPlayer());
-                                    BSBMap.put(-900, finalBsnet);
-                                }else{
-                                    bs.setProgress(finalBsnet.getProgress());
-                                    if(!bs.getPlayers().contains(event.getPlayer())) bs.addPlayer(event.getPlayer());
+                                    BossBar bs = BSBMap.get(-900);
+                                    if(bs == null){
+                                        finalBsnet.addPlayer(event.getPlayer());
+                                        BSBMap.put(-900, finalBsnet);
+                                    }else{
+                                        bs.setProgress(finalBsnet.getProgress());
+                                        if(!bs.getPlayers().contains(event.getPlayer())) bs.addPlayer(event.getPlayer());
+                                    }
+                                }catch (Exception e){
+                                    e.printStackTrace();
                                 }
-                            }catch (Exception e){
-                                e.printStackTrace();
                             }
                         }
                     });
