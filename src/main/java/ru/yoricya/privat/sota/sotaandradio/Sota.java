@@ -1,9 +1,6 @@
 package ru.yoricya.privat.sota.sotaandradio;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.json.JSONObject;
-
 import static ru.yoricya.privat.sota.sotaandradio.SotaAndRadio.networkIntGenParse;
 
 public class Sota {
