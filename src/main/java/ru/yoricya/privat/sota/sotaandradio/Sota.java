@@ -36,6 +36,7 @@ public class Sota {
     }
 
     public double getFrequency(){
+
         if(Type.equalsIgnoreCase("TV")) return 500;
 
         if(Type.toLowerCase().contains("tv")){
