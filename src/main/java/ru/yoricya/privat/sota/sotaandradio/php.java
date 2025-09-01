@@ -1,7 +1,5 @@
 package ru.yoricya.privat.sota.sotaandradio;
 
-import org.json.JSONObject;
-
 import java.io.*;
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -28,24 +26,10 @@ public class php {
         }
     }
     public static String file_get_contents(String filename) throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(filename));
-        StringBuilder builder = new StringBuilder();
-        String line;
-
-        // For every line in the file, append it to the string builder
-        while((line = reader.readLine()) != null)
-        {
-            if(line.equalsIgnoreCase("\n")){
-                builder.append("\n");
-            } else if (line.equalsIgnoreCase("")) {
-                builder.append("\n");
-            }else{
-                builder.append(line);
-            }
-        }
-
-        reader.close();
-        return builder.toString();
+        var a = new FileInputStream(filename);
+        var b = a.readAllBytes();
+        a.close();
+        return new String(b);
     }
     public static boolean if_file_exs(String filename) {
         File file = new File(filename);
