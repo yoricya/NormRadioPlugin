@@ -1,8 +1,8 @@
-package ru.yoricya.privat.sota.sotaandradio.v2;
+package ru.yoricya.privat.sota.sotaandradio.v2.Station;
 
 import org.json.JSONObject;
 
-public class FMStation extends Station {
+public class TVStation extends Station {
     public String name;
     public double frequency;
 
@@ -22,7 +22,7 @@ public class FMStation extends Station {
         JSONObject json = super.stationSerialize();
 
         // Save type
-        json.put("type", 1);
+        json.put("type", 2);
 
         // Save name
         json.put("name", name);

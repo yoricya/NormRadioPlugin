@@ -1,4 +1,4 @@
-package ru.yoricya.privat.sota.sotaandradio.v2;
+package ru.yoricya.privat.sota.sotaandradio.v2.Station;
 
 import org.bukkit.Location;
 import org.json.JSONObject;
@@ -168,7 +168,9 @@ public abstract class Station {
             if(hrdns == 0)
                 continue;
 
-            if(hrdns < 1)
+            if(hrdns < 0)
+                hrdns = 1000;
+            else if(hrdns < 1)
                 hrdns = 1;
             else if(hrdns > 100)
                 hrdns = 50;

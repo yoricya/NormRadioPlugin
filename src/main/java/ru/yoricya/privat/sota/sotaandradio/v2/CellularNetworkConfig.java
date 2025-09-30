@@ -79,7 +79,11 @@ public class CellularNetworkConfig {
                     yield simName;
                 }
 
-                case "allowroaming" -> new RoamingPolicyAllow();
+                case "allow_mcc_roaming" -> new RoamingPolicy(true, false);
+
+                case "allow_mnc_roaming" -> new RoamingPolicy(false, true);
+
+                case "allow_all_roaming" -> new RoamingPolicy(true, true);
 
                 default -> throw new IllegalStateException("Unexpected value: " + key);
             };
@@ -91,12 +95,15 @@ public class CellularNetworkConfig {
     }
 
     public abstract static class Config {}
+
     public static class Mcc extends Config {
         public List<Integer> allowMccList = new ArrayList<>();
     }
+
     public static class Mnc extends Config {
         public List<Integer> allowMncList = new ArrayList<>();
     }
+
     public static class NetworkGenerations extends Config {
         public List<Generation> supportedGenerations = new ArrayList<>();
         public Generation getFastestGeneration() {
@@ -109,7 +116,17 @@ public class CellularNetworkConfig {
                     .orElse(null);
         }
     }
-    public static class RoamingPolicyAllow extends Config {}
+
+    public static class RoamingPolicy extends Config {
+        public RoamingPolicy(boolean mcc, boolean mnc) {
+            this.mccRoaming = mcc;
+            this.mncRoaming = mnc;
+        }
+
+        public boolean mccRoaming;
+        public boolean mncRoaming;
+    }
+
     public static class SimName extends Config {
         public String name;
     }

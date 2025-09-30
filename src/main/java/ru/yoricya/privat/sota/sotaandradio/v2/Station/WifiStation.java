@@ -1,4 +1,4 @@
-package ru.yoricya.privat.sota.sotaandradio.v2;
+package ru.yoricya.privat.sota.sotaandradio.v2.Station;
 
 import org.json.JSONObject;
 

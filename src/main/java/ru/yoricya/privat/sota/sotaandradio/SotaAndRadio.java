@@ -18,9 +18,15 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import org.bukkit.util.FileUtil;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
 import ru.yoricya.privat.sota.sotaandradio.v2.*;
+import ru.yoricya.privat.sota.sotaandradio.v2.Phone.PhoneData;
+import ru.yoricya.privat.sota.sotaandradio.v2.Phone.PhoneDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Player.PlayerData;
+import ru.yoricya.privat.sota.sotaandradio.v2.Player.PlayerDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Station.*;
 
 import java.io.File;
 import java.util.*;
@@ -33,9 +39,10 @@ import java.util.stream.Collectors;
 
 public final class SotaAndRadio extends JavaPlugin implements Listener {
 
+    // Db's
     public static StationDb stationDb;
-
     public static PlayerDb playerDb;
+    public static PhoneDb phoneDb;
 
     static final Logger logger = Logger.getLogger("Sota&Radio Plugin");
 
@@ -46,10 +53,13 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         logger.log(Level.INFO, "Initializing plugin...");
         long startTime = System.currentTimeMillis();
 
-        stationsDbLoader();
-        playersDbLoader();
+        // Папка бекапов
+        new File(getDataFolder(), "stationBackups").mkdirs();
 
-        new File("plugins"+File.separator+"SotaAndRadio"+File.separator+"stationBackups").mkdirs();
+        // Загрузка Дб
+        stationsDbLoader(startTime);
+        playersDbLoader(startTime);
+        phonesDbLoader(startTime);
 
         if (!getServer().getOnlinePlayers().isEmpty()) for (Player player : getServer().getOnlinePlayers()){
             var playerData = playerDb.loadPlayer(player);
@@ -64,12 +74,22 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         logger.log(Level.INFO, "Plugin initializing done with "+(System.currentTimeMillis() - startTime)+" ms.");
     }
 
-    void stationsDbLoader() {
+    void stationsDbLoader(long plStartTime) {
         logger.log(Level.INFO, "Loading stationsDb.");
         long startTime = System.currentTimeMillis();
 
+        var dbFile = new File(getDataFolder(), "stationsDb.json");
+
+        // Backup Db
+        if (dbFile.exists()){
+            int currentBackupDirName = (int) (plStartTime / 1000 / 60);
+            new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName).mkdirs();
+            FileUtil.copy(dbFile, new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName + File.separator + "stationsDb.json"));
+        }
+
+        // Load Db
         try {
-            stationDb = new StationDb(new File("plugins"+File.separator+"SotaAndRadio"+File.separator+"stationsDb.json"));
+            stationDb = new StationDb(dbFile);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -77,16 +97,47 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }
     }
 
-    void playersDbLoader() {
+    void playersDbLoader(long plStartTime) {
         logger.log(Level.INFO, "Loading playersDb.");
         long startTime = System.currentTimeMillis();
 
+        var dbFile = new File(getDataFolder(), "playersDb.json");
+
+        // Backup Db
+        if (dbFile.exists()){
+            int currentBackupDirName = (int) (plStartTime / 1000 / 60);
+            new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName).mkdirs();
+            FileUtil.copy(dbFile, new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName + File.separator + "playersDb.json"));
+        }
+
         try {
-            playerDb = new PlayerDb(new File("plugins"+File.separator+"SotaAndRadio"+File.separator+"playersDb.json"));
+            playerDb = new PlayerDb(dbFile);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
             logger.log(Level.INFO, "Loading playersDb done with "+(System.currentTimeMillis() - startTime)+"ms.");
+        }
+    }
+
+    void phonesDbLoader(long plStartTime) {
+        logger.log(Level.INFO, "Loading phonesDb.");
+        long startTime = System.currentTimeMillis();
+
+        var dbFile = new File(getDataFolder(), "phonesDb.json");
+
+        // Backup Db
+        if (dbFile.exists()){
+            int currentBackupDirName = (int) (plStartTime / 1000 / 60);
+            new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName).mkdirs();
+            FileUtil.copy(dbFile, new File(getDataFolder(), "stationBackups" + File.separator + currentBackupDirName + File.separator + "phonesDb.json"));
+        }
+
+        try {
+            phoneDb = new PhoneDb(dbFile);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            logger.log(Level.INFO, "Loading phonesDb done with "+(System.currentTimeMillis() - startTime)+"ms.");
         }
     }
 
@@ -103,13 +154,14 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     void saveAllData() {
         stationDb.saveDb();
         playerDb.saveDb();
+        phoneDb.saveDb();
     }
 
     @Override
     public boolean onCommand(@NonNull CommandSender sender, @NonNull Command command,  @NonNull String label, @NonNull String[] args) {
         ThreadPool.execute(() -> {
-            if (!command.testPermission(sender)) {
-                sender.sendMessage("Нет прав на использование данной команды!");
+            if (!command.testPermissionSilent(sender)) {
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cУ вас нет прав для использования этой команды!"));
                 return;
             }
 
@@ -133,170 +185,171 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     Long id_of_station = null;
 
                     // FM Radio - /newSota radio <Freq> <Power> <Name>
-                    if (stationType.equals("radio")) {
+                    switch (stationType) {
+                        case "fmradio" -> {
 
-                        if (args.length < 4) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&c&lНе все арги указаны!" +
-                                            "\n&e&l/newSota radio <Частота> <Мощность> <Имя> "));
-                            return;
-                        }
-
-                        // Генерируем ID
-                        id_of_station = stationDb.randomId();
-
-                        double freq;
-                        double power;
-
-                        // Парсим значения
-                        try{
-                            freq = Double.parseDouble(args[1]);
-                            power = Double.parseDouble(args[2]);
-                        } catch (NumberFormatException e) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lЧастота и мощность должны быть числом!"));
-                            return;
-                        }
-
-                        // Создаем станцию
-                        FMStation station = new FMStation();
-                        station.stationLocation = ((Player) sender).getLocation().clone();
-                        station.id = id_of_station;
-                        station.power = power;
-                        station.frequency = freq;
-                        station.name = args[3];
-
-                        // Добавляем станцию
-                        stationDb.addStation(station);
-                    } else if (stationType.equals("tv")) {
-                        // Tv Radio - /newSota tv <Freq> <Power> <Name>
-
-                        if (args.length < 4) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&c&lНе все арги указаны!" +
-                                            "\n&e&l/newSota tv <Частота> <Мощность> <Имя> "));
-                            return;
-                        }
-
-                        // Генерируем ID
-                        id_of_station = stationDb.randomId();
-
-                        double freq;
-                        double power;
-
-                        // Парсим значения
-                        try{
-                            freq = Double.parseDouble(args[1]);
-                            power = Double.parseDouble(args[2]);
-                        } catch (NumberFormatException e) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lЧастота и мощность должны быть числом!"));
-                            return;
-                        }
-
-                        // Создаем станцию
-                        TVStation station = new TVStation();
-                        station.stationLocation = ((Player) sender).getLocation().clone();
-                        station.id = id_of_station;
-                        station.power = power;
-                        station.frequency = freq;
-                        station.name = args[3];
-
-                        // Добавляем станцию
-                        stationDb.addStation(station);
-                    } else if (stationType.equals("mobilebs")) {
-                        // Mobile Base Station - /newSota mobilebs <Sota name> <Power> <Options>
-
-                        if (args.length < 4) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&c&lНе все арги указаны!" +
-                                            "\n&e&l/newSota mobilebs <Имя соты> <Мощность> <Опции соты, формата 'key1:val1,val2;key2:val3,val4'> "));
-                            return;
-                        }
-
-                        // Генерируем ID
-                        id_of_station = stationDb.randomId();
-
-                        double power;
-
-                        // Парсим значения
-                        try{
-                            power = Double.parseDouble(args[2]);
-                        } catch (NumberFormatException e) {
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lЧастота и мощность должны быть числом!"));
-                            return;
-                        }
-
-                        // Создаем станцию
-                        MobileBaseStation mobileBaseSattion = new MobileBaseStation();
-
-                        mobileBaseSattion.stationLocation = ((Player) sender).getLocation().clone();
-                        mobileBaseSattion.id = id_of_station;
-                        mobileBaseSattion.power = power;
-                        mobileBaseSattion.name = args[1];
-
-                        // Парсим опции
-                        for (CellularNetworkConfig.Config config: CellularNetworkConfig.ParseParams(args[3])){
-                            switch (config){
-                                case CellularNetworkConfig.Mcc mccConfig -> {
-                                    mobileBaseSattion.supportMnc = mccConfig.allowMccList.stream()
-                                            .mapToInt(Integer::intValue)
-                                            .boxed() // int -> Integer
-                                            .collect(Collectors.toSet());
-                                }
-
-                                case CellularNetworkConfig.Mnc mncConfig -> {
-                                    mobileBaseSattion.supportMnc = mncConfig.allowMncList.stream()
-                                            .mapToInt(Integer::intValue)
-                                            .boxed() // int -> Integer
-                                            .collect(Collectors.toSet());
-                                }
-
-                                case CellularNetworkConfig.RoamingPolicyAllow ignored -> {
-                                    mobileBaseSattion.allowIncomingRoaming = true;
-                                }
-
-                                case CellularNetworkConfig.NetworkGenerations generations -> {
-                                    mobileBaseSattion.generation = generations.supportedGenerations.getFirst();
-                                }
-
-                                default -> throw new IllegalStateException("Unexpected value: " + config);
+                            if (args.length < 4) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        "&c&lНе все арги указаны!&r" +
+                                                "\n&e/newSota fmradio <Частота> <Мощность> <Имя> "));
+                                return;
                             }
-                        }
 
-                        // Добавляем станцию
-                        stationDb.addStation(mobileBaseSattion);
+                            double freq;
+                            double power;
+
+                            // Парсим значения
+                            try {
+                                freq = Double.parseDouble(args[1]);
+                                power = Double.parseDouble(args[2]);
+                            } catch (NumberFormatException e) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cЧастота и мощность должны быть целым или дробным числом!"));
+                                return;
+                            }
+
+                            // FM диапазон
+                            if (freq < 85 || freq > 108) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cIllegal FM frequency! Min 85Mhz, max 108Mhz."));
+                                return;
+                            }
+
+                            // Генерируем ID
+                            id_of_station = stationDb.randomId();
+
+                            // Создаем станцию
+                            FMStation station = new FMStation();
+                            station.stationLocation = ((Player) sender).getLocation().clone();
+                            station.id = id_of_station;
+                            station.power = power;
+                            station.frequency = freq;
+                            station.name = args[3];
+
+                            // Добавляем станцию
+                            stationDb.addStation(station);
+                        }
+                        case "tv" -> {
+                            // Tv Radio - /newSota tv <Freq> <Power> <Name>
+
+                            if (args.length < 4) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        "&c&lНе все арги указаны!" +
+                                                "\n&e/newSota tv <Частота> <Мощность> <Имя>"));
+                                return;
+                            }
+
+                            double freq;
+                            double power;
+
+                            // Парсим значения
+                            try {
+                                freq = Double.parseDouble(args[1]);
+                                power = Double.parseDouble(args[2]);
+                            } catch (NumberFormatException e) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cЧастота и мощность должны быть целым или дробным числом!"));
+                                return;
+                            }
+
+                            // Генерируем ID
+                            id_of_station = stationDb.randomId();
+
+                            // Создаем станцию
+                            TVStation station = new TVStation();
+                            station.stationLocation = ((Player) sender).getLocation().clone();
+                            station.id = id_of_station;
+                            station.power = power;
+                            station.frequency = freq;
+                            station.name = args[3];
+
+                            // Добавляем станцию
+                            stationDb.addStation(station);
+                        }
+                        case "mobilebs" -> {
+                            // Mobile Base Station - /newSota mobilebs <Sota name> <Power> <Options>
+
+                            if (args.length < 4) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                        "&c&lНе все арги указаны!&r" +
+                                                "\n&e/newSota mobilebs <Имя соты> <Мощность> <Опции соты, формата 'key1:val1,val2;key2:val3,val4'> "));
+                                return;
+                            }
+
+                            double power;
+
+                            // Парсим значения
+                            try {
+                                power = Double.parseDouble(args[2]);
+                            } catch (NumberFormatException e) {
+                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cМощность должна быть целым или дробным числом!"));
+                                return;
+                            }
+
+                            // Создаем станцию
+                            MobileBaseStation mobileBaseSattion = new MobileBaseStation();
+
+                            // Генерируем ID
+                            id_of_station = stationDb.randomId();
+
+                            mobileBaseSattion.stationLocation = ((Player) sender).getLocation().clone();
+                            mobileBaseSattion.id = id_of_station;
+                            mobileBaseSattion.power = power;
+                            mobileBaseSattion.name = args[1];
+
+                            // Парсим опции
+                            for (CellularNetworkConfig.Config config : CellularNetworkConfig.ParseParams(args[3])) {
+                                switch (config) {
+                                    case CellularNetworkConfig.Mcc mccConfig -> {
+                                        mobileBaseSattion.supportMcc = new HashSet<>();
+                                        mobileBaseSattion.supportMcc.addAll(mccConfig.allowMccList);
+                                    }
+
+                                    case CellularNetworkConfig.Mnc mncConfig -> {
+                                        mobileBaseSattion.supportMnc = new HashSet<>();
+                                        mobileBaseSattion.supportMnc.addAll(mncConfig.allowMncList);
+                                    }
+
+                                    case CellularNetworkConfig.RoamingPolicy roamingPolicy -> {
+                                        mobileBaseSattion.allowMccRoaming = roamingPolicy.mccRoaming;
+                                        mobileBaseSattion.allowMncRoaming = roamingPolicy.mncRoaming;
+                                    }
+
+                                    case CellularNetworkConfig.NetworkGenerations generations -> {
+                                        mobileBaseSattion.supportGenerations = new HashSet<>();
+                                        mobileBaseSattion.supportGenerations.addAll(generations.supportedGenerations);
+                                    }
+
+                                    default -> throw new IllegalStateException("Unexpected value: " + config);
+                                }
+                            }
+
+                            // Добавляем станцию
+                            stationDb.addStation(mobileBaseSattion);
+                        }
                     }
 
                     // Если произошла ошибка
                     if (id_of_station == null) {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lНе все арги указаны!"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lТипы станций:&r" +
-                                "\n &r&l&nwifi&r&l - Wi-Fi сеть." +
-                                "\n &r&l&nmobilebs&r&l - Мобильная Базовая Станция." +
-                                "\n &r&l&nradio&r&l - FM Радио." +
-                                "\n &r&l&ntv&r&l - TV Станция."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', """
+                                &aТипы станций:&r
+                                   &nwifi&r - Wi-Fi сеть.
+                                   &nmobilebs&r - Мобильная Базовая Станция.
+                                   &nfmradio&r - FM Радио.
+                                   &ntv&r - TV Станция."""));
+
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                "&e&l/newSota <Тип> ..."));
+                                "&e/newSota <Тип> ..."));
                         return;
                     }
 
                     // Если все окей
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "&a&lСота создана! ID cоты:" + id_of_station));
+                    ComponentBuilder cb = new ComponentBuilder();
+                    cb.event(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, String.valueOf(id_of_station)));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &aСота создана! ID cоты: " + id_of_station));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &l&nClick to copy ID."));
+                    sender.spigot().sendMessage(cb.build());
 
                     // Ну и сейвим, да
                     saveAllData();
-
-                    //Сделай бекапы аааааа!
-//                        file_put_contents("Sotas"+File.separator+"Sotas.json", Sotas.toString());
-//                        ThreadPool.execute(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                synchronized (SotasHandlers) {
-//                                    String filename = System.currentTimeMillis() + "bkp.json";
-//                                    file_put_contents("Sotas" + File.separator + "BKP" + File.separator + filename, Sotas.toString());
-//                                }
-//                            }
-//                        });
 
                     return;
                 }
@@ -304,16 +357,16 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 // Удалить соту
                 if (command.getName().equalsIgnoreCase("delSota")) {
                     if (args.length < 1 || !isNum(args[0])) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lНе все арги указаны!"));
-                        sender.sendMessage("/delSota <ID>");
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lНе все аргументы указаны!"));
+                        sender.sendMessage("&e/delSota <ID>");
                         return;
                     }
 
                     var id = Long.parseLong(args[0]);
                     if (stationDb.removeStation(id))
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&e&lСота удалена!"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eСота удалена!"));
                     else
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&e&lСота не существует!"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eСота не существует!"));
 
                     return;
                 }
@@ -321,7 +374,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 // Ближайшие соты
                 if (command.getName().equalsIgnoreCase("nearsota")) {
                     if (!(sender instanceof Player)) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lЭту команду можно выполнять только от игрока!"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cЭту команду можно выполнять только от игрока!"));
                         return;
                     }
 
@@ -330,7 +383,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     List<StationDb.NearStationResult> listOfStations = stationDb.nearStations(player_location, station -> true);
 
                     if (listOfStations.isEmpty()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lБлижайших к вам сот не обнаружено."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cБлижайших к вам сот нет."));
                         return;
                     }
 
@@ -346,9 +399,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                         cb.append(ChatColor.translateAlternateColorCodes('&',"----------------------\n"));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"&lID: "+stationResult.station.id));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &lName: "+stationResult.station.getName()));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &lSignal: "+stationResult.signalPrecent +"%"));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &lDistance: "+Math.round(stationResult.station.stationLocation.distance(player_location)) +" blocks"));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n&r  Name: "+stationResult.station.getName()));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  Signal: "+stationResult.signalPrecent +"%"));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  Distance: "+Math.round(stationResult.station.stationLocation.distance(player_location)) +" blocks"));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &l&nClick to copy ID."));
 
                         sender.spigot().sendMessage(cb.build());
@@ -381,10 +434,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (param.equalsIgnoreCase("off_radio")) {
                         if (value != null) {
                             playerData.paramOffRadio.set(Boolean.parseBoolean(value));
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lПараметр изменен"));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aПараметр изменен"));
                         } else {
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&a&lТекущее значение: " + playerData.paramOffRadio));
+                                    "&aТекущее значение: " + playerData.paramOffRadio));
                         }
                     } else
 
@@ -392,10 +445,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (param.equalsIgnoreCase("off_tv")) {
                         if (value != null) {
                             playerData.paramOffTv.set(Boolean.parseBoolean(value));
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lПараметр изменен"));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aПараметр изменен"));
                         } else {
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&a&lТекущее значение: "+playerData.paramOffTv));
+                                    "&aТекущее значение: "+playerData.paramOffTv));
                         }
                     } else
 
@@ -403,10 +456,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (param.equalsIgnoreCase("off_mobile")) {
                         if (value != null) {
                             playerData.paramOffMobile.set(Boolean.parseBoolean(value));
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lПараметр изменен"));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aПараметр изменен"));
                         } else {
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&a&lТекущее значение: "+playerData.paramOffMobile));
+                                    "&aТекущее значение: "+playerData.paramOffMobile));
                         }
                     } else
 
@@ -414,20 +467,25 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (param.equalsIgnoreCase("off_wifi")) {
                         if (value != null) {
                             playerData.paramOffWifi.set(Boolean.parseBoolean(value));
-                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lПараметр изменен"));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aПараметр изменен"));
                         } else {
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&a&lТекущее значение: "+playerData.paramOffWifi));
+                                    "&aТекущее значение: "+playerData.paramOffWifi));
                         }
+                    } else
+
+                    // DEBUG Last Iteration Time
+                    if (param.equalsIgnoreCase("debug_lit")) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                "&aТекущее значение: "+playerData.lastIterationTime.get()+"ms"));
                     } else {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                 """
-                                      
-                                      &e&lЧто-то не то! Проверьте правильно ли вы вводите команды:
-                                        &r&l&noff_radio <true/false>&r&l (Отображение радиостанций)
-                                        &l&noff_tv <true/false>&r&l (Отображение TV станций)
-                                        &l&noff_wifi <true/false>&r&l (Отображение Wi-Fi сетей)
-                                        &l&noff_mobile <true/false>&r&l (Отображение мобильных сетей)"""));
+                                      &e&lЧто-то не то! Проверьте правильно ли вы вводите команды:&r
+                                        &noff_radio <true/false>&r (Отображение радиостанций)
+                                        &noff_tv <true/false>&r (Отображение TV станций)
+                                        &noff_wifi <true/false>&r (Отображение Wi-Fi сетей)
+                                        &noff_mobile <true/false>&r (Отображение мобильных сетей)"""));
                     }
 
                     return;
@@ -436,18 +494,24 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 //cmd
                 if (command.getName().equalsIgnoreCase("helpSota")) {
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "&a&l&n/helpSota&r&a&l - Показать этот список,"));
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &l&n/myOperator <Имя>&r&l - Установить оператора."));
+                            "&a&n/helpSota&r&a - Показать этот список,"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &n/myOperator <Имя>&r - Установить оператора."));
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            " &l&n/userParam&r&l - Настройка параметров пользователя."));
+                            " &n/userParam&r - Настройка параметров пользователя."));
                     if (sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&l&n/newSota&r&l - Создать новую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&l&n/delSota&r&l - Удалить соту"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&l&n/nearSota&r&l - Найти ближайшую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&l&n/setPhone&r&l - Создать новый телефон."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&l&n/delPhone&r&l - Деактивировать телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/newSota&r - Создать новую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/delSota&r - Удалить соту"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/nearSota&r - Найти ближайшую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/newPhone&r - Создать новый телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/delPhone&r - Удалить телефон."));
                     }
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&l&n/infoPhone&r&l - Информация о телефоне."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/infoPhone&r - Информация о телефоне."));
+
+                    if (sender.isOp()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &b&n/infoMobileNetwork <id>&r - Информация о соте по ее ID."));
+                    }
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &b&n/infoMobileNetwork&r - Информация о текущей соте."));
+
                     //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
                     //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
                     return;
@@ -455,30 +519,19 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                 // Создает "Телефон" /setPhone <Phone name> <Other params>
                 // Other params: net:gsm,gprs,edge,cdma,hspa,hspa+,lte;mcc:250,251;mnc:001,002;allowRoaming:true
-                if (command.getName().equalsIgnoreCase("setPhone")) {
+                if (command.getName().equalsIgnoreCase("newPhone")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
                         return;
                     }
 
-                    if (!sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lУ вас нет прав для использования этой команды!"));
-                        return;
-                    }
-
                     if (args.length < 2) {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "&e&lЧто-то не то! Проверьте правильно ли вы вводите команды:\n  &n/setPhone <Имя телефона> <Параметры формата 'key1:val1,val2;key2:val3,val4'>"));
+                                    "&eЧто-то не то! Проверьте правильно ли вы вводите команды:\n  &n/newPhone <Имя телефона> <Параметры формата 'key1:val1,val2;key2:val3,val4'>"));
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "  &a&lВ имени телефона поддерживаются управляющие символы '&n&'&r&a&l которые делают текст цветным! &c&lНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
+                                    "  &aВ имени телефона поддерживаются управляющие символы '&n&'&r&a которые делают текст цветным! &cНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "  &c&lНБТ Теги телефона наложатся на предмет в вашей руке!"));
-//                                sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-//                                        "&lВсе типы сетей:" +
-//                                                "\n &r&n&l1&r&l - &lGSM Только связь и смски. &a&l(Относится к сетям 2G)" +
-//                                                "\n &n&l2&r&l - &lEDGE Связь и слабый интернет. &a&l(Относится к сетям 2G)" +
-//                                                "\n &n&l3&r&l - &l3G Связь и интернет средней скорости. &a&l(Относится к сетям 3G)" +
-//                                                "\n &n&l4&r&l - &l4G Только быстрый интернет. &a&l(Относится к сетям 4G)"));
+                                    "  &cНБТ Теги телефона наложатся на предмет в вашей руке!"));
                         return;
                     }
 
@@ -491,7 +544,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     // Получаем Meta и Data Container предмета в руке
                     ItemMeta metaInHand = itemInHand.getItemMeta();
                     if (metaInHand == null) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lВозникла ошибка: ItemMeta is null."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cВозникла ошибка: ItemMeta is null."));
                         return;
                     }
 
@@ -504,46 +557,36 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     CellularNetworkConfig.Generation mainPhoneGeneration = null; // Основное поколение сети телефона
                     CellularNetworkConfig.SimName mainSimName = null; // Имя симки телефона
 
+                    // Создаем сам телефон
+                    PhoneData phoneData = new PhoneData(0);
+                    phoneData.phoneName = args[0];
+                    
                     // Итерация по конфигам
                     for(CellularNetworkConfig.Config config : configs) {
                         switch (config){
                             case CellularNetworkConfig.Mcc supported_mcc -> {
-                                int[] array = supported_mcc.allowMccList.stream()
-                                        .mapToInt(Integer::intValue)
-                                        .toArray();
-
-                                dataContainer.set(new NamespacedKey(getPlugin(), "s_mcc"),
-                                        PersistentDataType.INTEGER_ARRAY, array);
+                                phoneData.supportMcc = new HashSet<>();
+                                phoneData.supportMcc.addAll(supported_mcc.allowMccList);
                             }
 
                             case CellularNetworkConfig.Mnc supported_mnc -> {
-                                int[] array = supported_mnc.allowMncList.stream()
-                                        .mapToInt(Integer::intValue)
-                                        .toArray();
-
-                                dataContainer.set(new NamespacedKey(getPlugin(), "s_mnc"),
-                                        PersistentDataType.INTEGER_ARRAY, array);
+                                phoneData.supportMnc = new HashSet<>();
+                                phoneData.supportMnc.addAll(supported_mnc.allowMncList);
                             }
 
                             case CellularNetworkConfig.NetworkGenerations supported_networks -> {
-                                String str = "";
-
-                                for (CellularNetworkConfig.Generation generation: supported_networks.supportedGenerations){
-                                    str += generation.toStr() + ";";
-                                }
-
+                                phoneData.supportNetworks = new HashSet<>();
+                                phoneData.supportNetworks.addAll(supported_networks.supportedGenerations);
                                 mainPhoneGeneration = supported_networks.getFastestGeneration();
-
-                                // e.t.c: gsm;edge;hspa;lte
-                                dataContainer.set(new NamespacedKey(getPlugin(), "s_nets"),
-                                        PersistentDataType.STRING, str);
                             }
 
-                            case CellularNetworkConfig.SimName simName -> mainSimName = simName;
+                            case CellularNetworkConfig.SimName simName -> {
+                                mainSimName = simName;
+                                phoneData.simName = simName.name;
+                            }
 
-                            case CellularNetworkConfig.RoamingPolicyAllow ignored -> {
-                                dataContainer.set(new NamespacedKey(getPlugin(), "roaming_policy_allow"),
-                                        PersistentDataType.BOOLEAN, true);
+                            case CellularNetworkConfig.RoamingPolicy roamingPolicy -> {
+                                phoneData.allowRoamingPolicy = roamingPolicy.mccRoaming || roamingPolicy.mncRoaming;
                             }
 
                             default -> throw new IllegalStateException("Unexpected value: " + config);
@@ -565,48 +608,64 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                     metaInHand.setLore(phoneLore);
 
+                    // Создаем телефон в БД
+                    PhoneData legalPhone = phoneDb.makePhoneData();
+                    legalPhone.fromWithoutImei(phoneData);
+
                     // Активируем телефон
-                    dataContainer.set(new NamespacedKey(getPlugin(), "phone_is_active"),
-                            PersistentDataType.BOOLEAN, true);
+                    dataContainer.set(new NamespacedKey(getPlugin(), "imei"),
+                            PersistentDataType.LONG, legalPhone.phoneImei);
 
                     // Мб не нужно, но на всякий случай применяем мету к item-у.
                     itemInHand.setItemMeta(metaInHand);
 
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&a&lТелефон создан!"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aТелефон создан!"));
 
                     return;
                 }
 
-                // Деактивирует телефон
+                // Не только деактивирует, но еще и удаляет телефон из базы
                 if (command.getName().equalsIgnoreCase("delPhone")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
                         return;
                     }
 
-                    if (!sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lУ вас нет прав для использования этой команды!"));
-                        return;
-                    }
-
                     // Получаем предмет в руке
                     ItemStack itemInHand = ((Player) sender).getItemInHand();
 
-                    // Получаем Meta и Data Container предмета в руке
+                    // Получаем Meta* и Data Container предмета в руке
                     ItemMeta metaInHand = itemInHand.getItemMeta();
                     if (metaInHand == null) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lВозникла ошибка: ItemMeta is null."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cВозникла ошибка: ItemMeta is null."));
                         return;
                     }
 
+                    // Получаем контейнер метатегов
                     PersistentDataContainer dataContainer = metaInHand.getPersistentDataContainer();
 
-                    // Деактивируем телефон
-                    dataContainer.set(new NamespacedKey(getPlugin(), "phone_is_active"),
-                            PersistentDataType.BOOLEAN, false);
+                    // Получаем IMEI из метатега
+                    var phoneIsActiveNamespacedKey = new NamespacedKey(getPlugin(), "imei");
+                    Long imei = dataContainer.get(phoneIsActiveNamespacedKey, PersistentDataType.LONG);
+                    if (imei == null) {
+                        // Если он пустой значит это не телефон
+                        return;
+                    }
+
+                    // Удаляем ЛООООР
+                    metaInHand.setLore(null);
+
+                    // Удаляем из бд
+                    phoneDb.removePhoneData(imei);
+
+                    // Удаляем IMEI из метатегов тем самым деактивируя телефон
+                    dataContainer.remove(new NamespacedKey(getPlugin(), "imei"));
 
                     // Мб не нужно, но на всякий случай
                     itemInHand.setItemMeta(metaInHand);
+
+                    // *_Meta является экстремистской организацией на территории Российской Федерации в части продажи продуктов Facebook и Instagram._
+
                     return;
                 }
 
@@ -628,7 +687,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     // Извлекаем инфу о телефоне
-                    Phone phone = Phone.getPhoneData(getPlugin(), metaInHand);
+                    PhoneData phone = phoneDb.getPhoneData(getPlugin(), metaInHand);
 
                     // Проверяем, а телефон ли это и активирован ли
                     if (phone == null){
@@ -668,15 +727,121 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                     // Send message
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "&a&lИнформация о телефоне:&r&l" +
-                                    "\n  "+mccSupports+
-                                    "\n  "+mncSupports+
-                                    "\n  "+networkSupports + roamingPolicy));
+                            "&aИнформация о телефоне:&r" +
+                                    "\n  imei: " + phone.phoneImei +
+                                    "\n  " + mccSupports +
+                                    "\n  " + mncSupports +
+                                    "\n  " + networkSupports + roamingPolicy));
                     return;
                 }
+
+                // Информация о соте
+                if (command.getName().equalsIgnoreCase("infoMobileNetwork")) {
+                    if (!(sender instanceof Player)) {
+                        sender.sendMessage("Эту команду можно выполнять только от игрока!");
+                        return;
+                    }
+
+                    // Получаем информацию о соте по ее ID
+                    if (args.length > 0) {
+
+                        // Парсим IDшник соты
+                        long id;
+                        try {
+                            id = Long.parseLong(args[0]);
+                        } catch (NumberFormatException e) {
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cID должен быть целым числом!"));
+                            return;
+                        }
+
+                        // Получааем саму соту
+                        if (stationDb.getStation(id) instanceof MobileBaseStation station) {
+
+                            var text = "&a&lИнформация о соте '" + id + "':&r";
+
+                            text += "\n   Поддержка MCC: " + station.supportMcc.stream()
+                                    .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
+
+                            text += "\n   Поддержка MNC: " + station.supportMnc.stream()
+                                    .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
+
+                            text += "\n   Поддержка сетей: " + station.supportGenerations.stream()
+                                    .map(CellularNetworkConfig.Generation::toStr).collect(Collectors.joining(", ")) + ".";
+
+                            text += "\n   Имя сети: " + station.name + ".";
+
+                            if (!station.allowMccRoaming) {
+                                text += "\n   &eСота не разрешает международный роуминг.";
+                            }
+
+                            if (!station.allowMncRoaming) {
+                                text += "\n   &eСота не разрешает внутренний роуминг.";
+                            }
+
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', text));
+
+                            return;
+                        }
+
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cСоты с таким ID видимо нет либо это не сота мобильной связи."));
+
+                        return;
+                    }
+
+                    // Получаем информацию о текущей соте игрока
+
+                    // Получаем данные игрока
+                    PlayerData playerData = playerDb.loadPlayer(((Player) sender));
+
+                    // Проверяем если ли вообще у игрока сеть
+                    if (playerData.networkInfo.noService.get()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eВы не подключены ни к одной сети!"));
+                        return;
+                    }
+
+                    ComponentBuilder cb = new ComponentBuilder();
+
+                    cb.event(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, String.valueOf(playerData.networkInfo.currentStation.get().id)));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"&a&lИнформация о текущей соте:&r"));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MCC: " + playerData.networkInfo.currentStation.get().supportMcc.stream()
+                            .map(String::valueOf).collect(Collectors.joining(", ")) + "."));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MNC: " + playerData.networkInfo.currentStation.get().supportMnc.stream()
+                            .map(String::valueOf).collect(Collectors.joining(", ")) + "."));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Тип подключения: " + playerData.networkInfo.networkGeneration.get().description + "."));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Уровень сети: " + playerData.networkInfo.signalStrength.get().intValue() + "%."));
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Имя сети: " + playerData.networkInfo.currentStation.get().name + "."));
+
+                    if (playerData.networkInfo.inMccRoaming.get()) {
+                        cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eМеждународный роуминг."));
+                    } else if (playerData.networkInfo.inMncRoaming.get()) {
+                        cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eВнутренний роуминг."));
+                    }
+
+                    if (!playerData.networkInfo.currentStation.get().allowMccRoaming) {
+                        cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eСота не разрешает международный роуминг."));
+                    }
+
+                    if (!playerData.networkInfo.currentStation.get().allowMncRoaming) {
+                        cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eСота не разрешает внутренний роуминг."));
+                    }
+
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &l&nClick to copy ID '" + playerData.networkInfo.currentStation.get().id + "'."));
+
+                    sender.spigot().sendMessage(cb.build());
+
+                    return;
+                }
+
             } catch (Exception e) {
-                e.printStackTrace();
-                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lПроизошла ошибка!"));
+                var tm = (int) (System.currentTimeMillis() / 10000);
+                logger.log(Level.WARNING, "Exception error id - '" + tm + "'. ", e);
+                sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cПроизошла ошибка! &c&lException error id - '" + tm + "'."));
             }
         });
         return true;
@@ -684,34 +849,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
     public static boolean isNum(String strNum) {
         try {
-            Integer.parseInt(strNum);
+            Long.parseLong(strNum);
             return true;
         } catch (NumberFormatException e) {
             return false;
         }
-    }
-
-    public void getPhoneFromItem(ItemStack itemInHand, AtomicReference<Phone> phoneReference) {
-        if (itemInHand.getType().isAir()) {
-            return;
-        }
-
-        var itemMeta = itemInHand.getItemMeta();
-        if (itemMeta == null){
-            return;
-        }
-
-        if (phoneReference.get() != null && itemInHand.equals(phoneReference.get().itemStack)) {
-            return;
-        }
-
-        var newPhone = Phone.getPhoneData(getPlugin(), itemMeta);
-        if (newPhone == null) {
-            return;
-        }
-
-        newPhone.itemStack = itemInHand;
-        phoneReference.set(newPhone);
     }
 
     @EventHandler
@@ -722,15 +864,20 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         PlayerData playerData = playerDb.loadPlayer(player);
         playerData.init(player);
 
-        // Ячейки для старых координатов игрока
+        // Ячейки для хранения координатов игрока
         final int[] oldPlayerCords = {0, 0, 0};
 
-        AtomicReference<Phone> phoneInPlayerHand = new AtomicReference<>(null);
+        // Предмет в руке игрока
+        AtomicReference<ItemStack> itemInPlayerHand = new AtomicReference<>(null);
+
+        // Текущий телефон
+        AtomicReference<PhoneData> phoneInPlayerHand = new AtomicReference<>(null);
 
         // Runnable таска
         BukkitRunnable br = new BukkitRunnable() {
             @Override
             public void run() {
+                var startTime = System.currentTimeMillis();
 
                 // Если игрок при новой итерации отключился
                 if (!player.isOnline()) {
@@ -746,11 +893,27 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     return;
                 }
 
-                // Получаем телефон в руке игрока
-                getPhoneFromItem(player.getInventory().getItemInMainHand(), phoneInPlayerHand);
+                // Получаем предмет в руке игрока
+                var item = player.getInventory().getItemInMainHand();
+                if (!item.equals(itemInPlayerHand.get())) {
 
-                // Если телефона в руке нет - то незачем идти дальше
+                    itemInPlayerHand.set(item);
+
+                    // Если игрок взял другой предмет - то парсим этот предмет на наличие метатегов телефона, и ложим в Atomic переменную.
+                    phoneInPlayerHand.set(phoneDb.getPhoneData(getPlugin(), item.getItemMeta()));
+
+                }
+
+                // Если телефона в руке нет
                 if (phoneInPlayerHand.get() == null) {
+
+                    // Чистим боссбары
+                    playerData.bossBarsTempData.entrySet().removeIf(entry -> {
+                        entry.getValue().removePlayer(player);
+                        return true;
+                    });
+
+                    // и незачем идти дальше
                     return;
                 }
 
@@ -767,8 +930,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 oldPlayerCords[1] = (int) playerLocation.getY();
                 oldPlayerCords[2] = (int) playerLocation.getZ();
 
-                // Считаем уровень сигнала от головы игрока
+                // Получаем локацию игрока
                 var playerLocationOfHead = playerLocation.clone();
+
+                // Считаем уровень сигнала от головы игрока
                 playerLocationOfHead.setY(playerLocation.getY() + 1);
 
                 // Ищем ближайшие соты
@@ -786,34 +951,34 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         return false;
                     }
 
-                    // Если в параметрах юзера отключены FM Станции со сразу скипаем
+                    // Если в параметрах юзера отключены FM Станции - то сразу скипаем их
                     if (playerData.paramOffRadio.get() && station instanceof FMStation)
                         return false;
 
                     if (station instanceof MobileBaseStation mobileBaseStation) {
 
-                        // Если в параметрах юзера отключены мобильные сети - то скипаем
+                        // Если в параметрах юзера отключены мобильные сети - то скипаем их
                         if (playerData.paramOffMobile.get()) {
                             return false;
                         }
 
                         // Если телефон не поддерживает поколение соты, то зачем ее рассчитывать?
-                        if (phone.supportNetworks.contains(mobileBaseStation.generation)){
+                        if (Collections.disjoint(phone.supportNetworks, mobileBaseStation.supportGenerations)){
                             return false;
                         }
 
-                        // Если и сота и телефон поддерживают роуминг - то сразу пропускаем ее
-                        if (phone.allowRoamingPolicy && mobileBaseStation.allowIncomingRoaming) {
+                        // Если и сота и телефон поддерживают роуминг - то просчитываем ее дальше
+                        if (phone.allowRoamingPolicy && mobileBaseStation.allowMccRoaming && mobileBaseStation.allowMncRoaming) {
                             return true;
                         }
 
-                        // Иначе ищем нужный нам mcc
-                        if (Collections.disjoint(phone.supportMcc, mobileBaseStation.supportMcc)) {
-                            return false;
+                        // Иначе ищем нужный нам mcc и mnc
+                        if (!Collections.disjoint(phone.supportMcc, mobileBaseStation.supportMcc) || !Collections.disjoint(phone.supportMnc, mobileBaseStation.supportMnc)) {
+                            return true;
                         }
 
-                        // и mnc
-                        return !Collections.disjoint(phone.supportMnc, mobileBaseStation.supportMnc);
+                        // Если ничего не подходит, скипаем соту
+                        return false;
                     }
 
                     // Если в параметрах юзера отключены TV Станции - то скипаем
@@ -824,457 +989,165 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (playerData.paramOffWifi.get() && station instanceof WifiStation)
                         return false;
 
-                    // Если ни один тригер не сработал то.. ну.. пускаем дальше, а что еще делать
+                    // Если ни один триггер не сработал то.. ну.. пускаем дальше, а что еще делать
                     return true;
                 });
 
-                float lastNetworkGenerationWeight = 0;
-                Boolean lastNetworkIsRoaming = null;
 
-                List<Long> changedBossBars = new ArrayList<>();
+//                List<Long> changedBossBars = new ArrayList<>();
+
+                // Вот тут уже пост-обработка,
                 for (StationDb.NearStationResult stationResult: stations_list) {
-                    // Вот тут уже пост-обработка,
-                    // после того, как был рассчитан уровень сигнала каждой станции,
+                    // после того как был рассчитан уровень сигнала каждой станции,
                     // то есть тут уже известны уровни сигналов каждой итерируемой соты.
 
-                    // Получаем боссбар из кеша, в кеше они сохраняются по ID-шнику станции,
-                    // и кеш этот нужен чтобы плавно управлять уровнем прогресса в зависимости
-                    // от сигнала станции.
-
-                    // ______________________________
-                    // Вот тут я конкретно запутался во всем, поэтому этот участок кода далко не конечный вариант
-
-                    BossBar bossBarOfStation = null;
-
-                    // FM Station
-                    if (stationResult.station instanceof FMStation fmStation) {
-                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(stationResult.station.id);
-
-                        changedBossBars.add(stationResult.station.id);
-
-                        // Если боссбара в кеше нету, создаем новый
-                        if (bossBarFromCache == null) {
-                            bossBarOfStation = getServer().createBossBar( fmStation.name + " (" + fmStation.frequency + "MHz)", BarColor.BLUE, BarStyle.SOLID);
-                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
-
-                            bossBarOfStation.setProgress(0);
-                            bossBarOfStation.addPlayer(player);
-                        } else {
-                            bossBarOfStation = bossBarFromCache;
-                        }
-                    }
+//                    System.out.println(stationResult.station.stationSerialize());
+//                    System.out.println(phoneInPlayerHand.get().serialize());
+//                    System.out.println("------------");
 
                     // Mobile Base Station
                     if (stationResult.station instanceof MobileBaseStation mobileBaseStation) {
-                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(1L);
-
-                        // Скипаем если вес generation меньше чем у предыдущей соты,
-                        // нам не нужно подключатся к более нисшевой (условно 2G) соте если есть более современная (условно 3G)
-                        if (mobileBaseStation.generation.networkGeneration <= lastNetworkGenerationWeight) {
-                            continue;
-                        }
-
-
-                        if (Collections.disjoint(phoneInPlayerHand.get().supportMcc, mobileBaseStation.supportMcc)
-                            || Collections.disjoint(phoneInPlayerHand.get().supportMnc, mobileBaseStation.supportMnc)) {
-                            lastNetworkIsRoaming = true;
-                        }
-
-                        // Устанавливаем вес
-                        lastNetworkGenerationWeight = mobileBaseStation.generation.networkGeneration;
-
-                        changedBossBars.add(1L);
-
-                        // Если боссбара в кеше нету, создаем новый
-                        if (bossBarFromCache == null) {
-
-                            bossBarOfStation = getServer().createBossBar(
-                                    mobileBaseStation.name+" ("+mobileBaseStation.generation.displayName+")", // OperatorName (Generation)
-                                    mobileBaseStation.generation.toBarColor(), BarStyle.SEGMENTED_6);
-
-                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
-
-                            bossBarOfStation.setProgress(0);
-                            bossBarOfStation.addPlayer(player);
-                        } else {
-                            bossBarOfStation = bossBarFromCache;
-                        }
+                        // Передаем станцию в обработку
+                        playerData.tempAcceptNetStation(mobileBaseStation, stationResult.signalPrecent, phoneInPlayerHand.get());
                     }
 
-                    // Если по каким-то причинам боссбар все еще null - то ну.. хз, continue
-                    if (bossBarOfStation == null) {
-                        continue;
-                    }
-
-                    // Дополнительные проверочки
-                    if (stationResult.signalPrecent > 100){
-                        stationResult.signalPrecent = 100;
-                    } else if (stationResult.signalPrecent < 1){
-                        continue;
-                    }
-
-                    // Ставим прогресс, боссбар требует от 0.0 до 1.0, поэтому делим проценты на 100.
-                    bossBarOfStation.setProgress(stationResult.signalPrecent / 100.0);
-                }
-
-                // Чистим лишние боссбары у игрока
-                playerData.bossBarsTempData.entrySet().removeIf(entry -> {
-                    if (changedBossBars.contains(entry.getKey())) {
-                        return false;
-                    }
-
-                    entry.getValue().removePlayer(player);
-                    return true;
-                });
-            }
-        };
-
-        // Запускаем каждые 10 тиков
-        br.runTaskTimerAsynchronously(getPlugin(), 20L, 20L);
-
-        // Все что ниже закомичено - это старая архитектура
-//        final int[] cords = {0, 0, 0};
+//                    // FM Station
+//                    if (stationResult.station instanceof FMStation fmStation) {
+//                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(stationResult.station.id);
 //
-//        final JSONObject[] plrSets = {new JSONObject()};
-//        final ConcurrentHashMap<Integer, BossBar> BSBMap = new ConcurrentHashMap<>();
+//                        changedBossBars.add(stationResult.station.id);
 //
-//        ThreadPool.execute(new Runnable() {
-//            @Override
-//            public void run() {
-//                if (!if_file_exs("Sotas" + File.separator + event.getPlayer().getName() + ".json")) {
-//                    plrSets[0].put("off_mobile_base_stations", false);
-//                    plrSets[0].put("off_tv", false);
-//                    plrSets[0].put("off_radio", false);
-//                    plrSets[0].put("off_wifi", false);
-//                    event.getPlayer().sendMessage(ChatColor.translateAlternateColorCodes('&',
-//                            "&a&lПривет! &e&lДля помощи по сотам используй &r&l&n/helpSota"));
-//                    file_put_contents("Sotas" + File.separator + event.getPlayer().getName() + ".json", plrSets[0].toString());
-//                } else {
+//                        // Если боссбара в кеше нету, создаем новый
+//                        if (bossBarFromCache == null) {
+//                            bossBarOfStation = getServer().createBossBar( fmStation.name + " (" + fmStation.frequency + "MHz)", BarColor.BLUE, BarStyle.SOLID);
+//                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
 //
-//                    try {
-//                        plrSets[0] = new JSONObject(file_get_contents("Sotas" + File.separator + event.getPlayer().getName() + ".json"));
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        });
-//
-//        //0 - Skip, 1 - Ok, 2 - Stop;
-//        SotaWork script = new SotaWork() {
-//            @Override
-//            public int work() {
-//                if (!event.getPlayer().isOnline()) return 2;
-//
-//                final Boolean[] reInitApiLock = {false};
-//                ThreadPool.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        PlayerSotasInfo.get(event.getPlayer()).reInit();
-//                        reInitApiLock[0] = true;
-//                        synchronized (reInitApiLock) {
-//                            reInitApiLock.notifyAll();
+//                            bossBarOfStation.setProgress(0);
+//                            bossBarOfStation.addPlayer(player);
+//                        } else {
+//                            bossBarOfStation = bossBarFromCache;
 //                        }
 //                    }
-//                });
 //
-//                var location = event.getPlayer().getLocation();
+//                    // Mobile Base Station
+//                    if (stationResult.station instanceof MobileBaseStation mobileBaseStation) {
+//                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(1L);
 //
-//                if (cords[0] == (int) location.getX() &&
-//                        cords[1] == (int) location.getY() &&
-//                        cords[2] == (int) location.getZ()) return 0;
-//
-//                cords[0] = (int) location.getX();
-//                cords[1] = (int) location.getY();
-//                cords[2] = (int) location.getZ();
-//
-//                ThreadPool.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        try {
-//                            if (!if_file_exs("Sotas" + File.separator + event.getPlayer().getName() + ".json")) {
-//                                plrSets[0].put("operator", "none");
-//                                plrSets[0].put("offmob", false);
-//                                plrSets[0].put("optest", true);
-//                                plrSets[0].put("offtv", false);
-//                                plrSets[0].put("offradio", false);
-//                                plrSets[0].put("offwifi", false);
-//                                file_put_contents("Sotas" + File.separator + event.getPlayer().getName() + ".json", plrSets[0].toString());
-//                            } else {
-//                                plrSets[0] = new JSONObject(file_get_contents("Sotas" + File.separator + event.getPlayer().getName() + ".json"));
-//                            }
-//                        } catch (Exception e) {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                });
-//                int net = 0;
-//
-//                double[] netprec = new double[4];
-//                BossBar bsnet = null;
-//
-//                if (plrSets[0].getBoolean("optest"))
-//                    bsnet = getServer().createBossBar("n", BarColor.BLUE, BarStyle.SOLID);
-//
-//                ItemStack is = event.getPlayer().getItemInHand();
-//                if (!getTag(is, "ph").equalsIgnoreCase("1")) {
-//                    for (Map.Entry<Integer, BossBar> entry : BSBMap.entrySet()) entry.getValue().removeAll();
-//                    BSBMap.clear();
-//                    return 1;
-//                }
-//
-//                String currentoperator = plrSets[0].getString("operator");
-//
-//                String phoneOptag = getTag(is, "op");
-//
-//                if (!phoneOptag.equals("n")) currentoperator = phoneOptag;
-//
-//                int maxnet = Integer.parseInt(getTag(is, "mn"));
-//
-//                ConcurrentHashMap<Integer, BossBar> BossbarsForAdd = new ConcurrentHashMap<>();
-//
-//                if (!reInitApiLock[0]) synchronized (reInitApiLock) {
-//                    try {
-//                        reInitApiLock.wait();
-//                    } catch (InterruptedException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                }
-//
-//                Sota networkSota = null;
-//
-//                for (Sota sota : SotasList) {
-//                    try {
-//                        try {
-//                            if (sota.Description.equals("OFF")) {
-//                                SotasList.remove(sota);
-//                                continue;
-//                            }
-//                        } catch (Exception e) {
-//                            e.printStackTrace();
+//                        // Скипаем если вес generation меньше чем у предыдущей соты,
+//                        // нам не нужно подключатся к более нисшевой (условно 2G) соте если есть более современная (условно 3G)
+//                        if (mobileBaseStation.generation.networkGeneration <= lastNetworkGenerationWeight) {
 //                            continue;
 //                        }
 //
-//                        BarStyle BStyle = BarStyle.SOLID;
-//                        String st = sota.Type;
-//                        BarColor bc = BarColor.BLUE;
 //
-//                        if (st.equalsIgnoreCase("wifi")) {
-//                            st = "WiFi";
-//                            bc = BarColor.WHITE;
-//                            BStyle = BarStyle.SEGMENTED_6;
-//                        } else if (st.equalsIgnoreCase("wifi5")) {
-//                            st = "WiFi-5G";
-//                            bc = BarColor.WHITE;
-//                            BStyle = BarStyle.SEGMENTED_10;
-//                        } else if (st.equalsIgnoreCase("wifi6")) {
-//                            st = "WiFi-6";
-//                            bc = BarColor.WHITE;
-//                            BStyle = BarStyle.SEGMENTED_10;
-//                        } else if (st.equalsIgnoreCase("wifi7")) {
-//                            st = "WiFi-7";
-//                            bc = BarColor.WHITE;
-//                            BStyle = BarStyle.SEGMENTED_10;
-//                        } else if (st.equalsIgnoreCase("GSM")) {
-//                            if (plrSets[0].getBoolean("offmob")) continue;
-//                            if (maxnet < 1) continue;
-//
-//                            bc = BarColor.RED;
-//                            st = "GSM";
-//
-//                            if (plrSets[0].getBoolean("optest")) {
-//                                if (bsnet == null) continue;
-//                                if (!currentoperator.equalsIgnoreCase(sota.Name)) continue;
-//                                if (net > 1) continue;
-//
-//                                double prec = SotaSignalPrecent(location, sota);
-//                                if (prec <= 0) continue;
-//
-//                                bsnet.setColor(BarColor.RED);
-//                                bsnet.setStyle(BarStyle.SEGMENTED_6);
-//                                bsnet.setTitle(sota.Name + " (GSM)");
-//
-//                                double precforbs = prec / 100.0;
-//                                if (precforbs > 1.0) precforbs /= 100.0;
-//                                netprec[0] += precforbs;
-//                                net = 1;
-//
-//                                networkSota = sota;
-//                                continue;
-//                            }
-//                        } else if (st.equalsIgnoreCase("EDGE")) {
-//                            if (plrSets[0].getBoolean("offmob")) continue;
-//                            if (maxnet < 2) continue;
-//
-//                            bc = BarColor.YELLOW;
-//                            st = "EDGE";
-//                            BStyle = BarStyle.SEGMENTED_6;
-//
-//                            if (plrSets[0].getBoolean("optest")) {
-//                                if (bsnet == null) continue;
-//                                if (!currentoperator.equalsIgnoreCase(sota.Name)) continue;
-//                                if (net > 2) continue;
-//
-//                                double prec = SotaSignalPrecent(location, sota);
-//                                if (prec <= 0) continue;
-//
-//                                bsnet.setColor(BarColor.YELLOW);
-//                                bsnet.setStyle(BarStyle.SEGMENTED_6);
-//                                bsnet.setTitle(sota.Name + " (EDGE)");
-//
-//                                double precforbs = prec / 100.0;
-//                                if (precforbs > 1.0) precforbs /= 100.0;
-//                                netprec[1] += precforbs;
-//                                net = 2;
-//
-//                                networkSota = sota;
-//                                continue;
-//                            }
-//                        } else if (st.equalsIgnoreCase("3G")) {
-//                            if (plrSets[0].getBoolean("offmob")) continue;
-//                            if (maxnet < 3) continue;
-//
-//                            bc = BarColor.GREEN;
-//                            st = "3G";
-//                            BStyle = BarStyle.SEGMENTED_6;
-//
-//                            if (plrSets[0].getBoolean("optest")) {
-//                                if (bsnet == null) continue;
-//                                if (!currentoperator.equalsIgnoreCase(sota.Name)) continue;
-//                                if (net > 3) continue;
-//
-//                                double prec = SotaSignalPrecent(location, sota);
-//                                if (prec <= 0) continue;
-//
-//                                bsnet.setColor(BarColor.GREEN);
-//                                bsnet.setStyle(BarStyle.SEGMENTED_6);
-//                                bsnet.setTitle(sota.Name + " (3G)");
-//
-//                                double precforbs = prec / 100.0;
-//                                if (precforbs > 1.0) precforbs /= 100.0;
-//                                netprec[2] += precforbs;
-//                                net = 3;
-//
-//                                networkSota = sota;
-//                                continue;
-//                            }
-//                        } else if (st.equalsIgnoreCase("4G")) {
-//                            if (plrSets[0].getBoolean("offmob")) continue;
-//                            if (maxnet < 4) continue;
-//
-//                            bc = BarColor.GREEN;
-//                            st = "LTE";
-//                            BStyle = BarStyle.SEGMENTED_6;
-//
-//                            if (plrSets[0].getBoolean("optest")) {
-//                                if (bsnet == null) continue;
-//                                if (!currentoperator.equalsIgnoreCase(sota.Name)) continue;
-//
-//                                double prec = SotaSignalPrecent(location, sota);
-//                                if (prec <= 0) continue;
-//
-//                                bsnet.setColor(BarColor.GREEN);
-//                                bsnet.setStyle(BarStyle.SEGMENTED_6);
-//                                bsnet.setTitle(sota.Name + " (LTE)");
-//
-//                                double precforbs = prec / 100.0;
-//                                if (precforbs > 1.0) precforbs /= 100.0;
-//                                netprec[3] += precforbs;
-//                                net = 4;
-//
-//                                networkSota = sota;
-//                                continue;
-//                            }
-//                        } else if (sota.Description.equalsIgnoreCase("TV")) {
-//                            if (plrSets[0].getBoolean("offtv")) continue;
-//                            st = "TV";
-//                        } else if (plrSets[0].getBoolean("offradio")) continue;
-//
-//                        double prec = SotaSignalPrecent(location, sota);
-//                        if (prec <= 0) continue;
-//
-//                        BossBar bossBar = getServer().createBossBar(sota.Name + " (" + st + ")", bc, BStyle);
-//                        double precforbs = prec / 100.0;
-//                        if (precforbs > 1.0) precforbs /= 100.0;
-//
-//                        double finalPrecforbs = precforbs;
-//                        ThreadPool.execute(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                PlayerSotasInfo.get(event.getPlayer()).addSota(finalPrecforbs, sota);
-//                            }
-//                        });
-//
-//                        bossBar.setProgress(precforbs);
-//                        BossbarsForAdd.put(sota.id, bossBar);
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//
-//                for (Map.Entry<Integer, BossBar> entry : BSBMap.entrySet()) {
-//                    if (BossbarsForAdd.get(entry.getKey()) == null) {
-//                        entry.getValue().removeAll();
-//                        BSBMap.remove(entry.getKey());
-//                    }
-//                }
-//
-//                for (Map.Entry<Integer, BossBar> entry : BossbarsForAdd.entrySet()) {
-//                    BossBar bs = BSBMap.get(entry.getKey());
-//                    if (bs != null) {
-//                        bs.setProgress(entry.getValue().getProgress());
-//                        if (!bs.getPlayers().contains(event.getPlayer())) bs.addPlayer(event.getPlayer());
-//                    } else {
-//                        BSBMap.put(entry.getKey(), entry.getValue());
-//                    }
-//                }
-//
-//                if (bsnet != null && !plrSets[0].getBoolean("offmob")) {
-//                    BossBar finalBsnet = bsnet;
-//                    int finalNet = net;
-//                    Sota finalNetworkSota = networkSota;
-//                    ThreadPool.execute(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            try {
-//
-//                                if (finalBsnet.getTitle().equals("n")) {
-//                                    finalBsnet.setTitle(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети"));
-//                                    finalBsnet.setColor(BarColor.WHITE);
-//                                    finalBsnet.setProgress(0);
-//                                    finalBsnet.setStyle(BarStyle.SEGMENTED_6);
-//                                } else {
-//                                    if (netprec[finalNet - 1] > 1.0) netprec[finalNet - 1] = 1.0;
-//                                    finalBsnet.setProgress(netprec[finalNet - 1]);
-//                                }
-//
-//                                BossBar bs = BSBMap.get(-900);
-//                                if (bs == null) {
-//                                    finalBsnet.addPlayer(event.getPlayer());
-//                                    BSBMap.put(-900, finalBsnet);
-//                                    bs = finalBsnet;
-//                                } else {
-//                                    bs.setProgress(finalBsnet.getProgress());
-//                                    if (!bs.getPlayers().contains(event.getPlayer())) bs.addPlayer(event.getPlayer());
-//                                }
-//
-//                                BossBar finalBs = bs;
-//                                ThreadPool.execute(new Runnable() {
-//                                    @Override
-//                                    public void run() {
-//                                        PlayerSotasInfo.get(event.getPlayer()).addNetSota(finalBs.getProgress(), finalNetworkSota);
-//                                    }
-//                                });
-//
-//                            } catch (Exception e) {
-//                                e.printStackTrace();
-//                            }
+//                        if (Collections.disjoint(phoneInPlayerHand.get().supportMcc, mobileBaseStation.supportMcc)
+//                            || Collections.disjoint(phoneInPlayerHand.get().supportMnc, mobileBaseStation.supportMnc)) {
+//                            lastNetworkIsRoaming = true;
 //                        }
-//                    });
-//                }
-//                return 0;
-//            }
-//        };
+//
+//                        // Устанавливаем вес
+//                        lastNetworkGenerationWeight = mobileBaseStation.generation.networkGeneration;
+//
+//                        changedBossBars.add(1L);
+//
+//                        // Если боссбара в кеше нету, создаем новый
+//                        if (bossBarFromCache == null) {
+//
+//                            bossBarOfStation = getServer().createBossBar(
+//                                    mobileBaseStation.name+" ("+mobileBaseStation.generation.displayName+")", // OperatorName (Generation)
+//                                    mobileBaseStation.generation.toBarColor(), BarStyle.SEGMENTED_6);
+//
+//                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
+//
+//                            bossBarOfStation.setProgress(0);
+//                            bossBarOfStation.addPlayer(player);
+//                        } else {
+//                            bossBarOfStation = bossBarFromCache;
+//                        }
+//                    }
+//                    // Получаем боссбар по ID шнику соты из кеша
+//                    BossBar bossBarOfStation = playerData.bossBarsTempData.get(stationResult.station.id);
+//
+//                    // Если по каким-то причинам боссбар все еще null - то ну.. хз, continue
+//                    if (bossBarOfStation == null) {
+//                        continue;
+//                    }
+//
+//                    // Указываем что такой-то боссбар с таким IDником еще используется и его выгружать не надо
+//                    changedBossBars.add(stationResult.station.id);
+//
+//                    // Дополнительные проверочки
+//                    if (stationResult.signalPrecent > 100){
+//                        stationResult.signalPrecent = 100;
+//                    } else if (stationResult.signalPrecent <= 0){
+//                        continue;
+//                    }
+//
+//                    // Ставим прогресс, боссбар требует от 0.0 до 1.0, поэтому делим проценты на 100.
+//                    bossBarOfStation.setProgress(stationResult.signalPrecent / 100.0);
+                }
+
+//                // Чистим лишние боссбары у игрока
+//                playerData.bossBarsTempData.entrySet().removeIf(entry -> {
+//                    if (changedBossBars.contains(entry.getKey())) {
+//                        return false;
+//                    }
+//
+//                    entry.getValue().removePlayer(player);
+//                    return true;
+//                });
+
+                // Применяем сотовую станцию
+                playerData.pushNetStation();
+
+                // Дальше мы применяем боссбар для телефона:
+
+                // Получаем боссбар для соты
+                var sotaBossbar = playerData.bossBarsTempData.get(1L);
+                if (sotaBossbar == null) {
+
+                    // Если его нет - то создаем новый
+                    sotaBossbar = getServer().createBossBar(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети")
+                            , BarColor.WHITE, BarStyle.SEGMENTED_6);
+                    sotaBossbar.setProgress(0);
+                    sotaBossbar.addPlayer(player);
+
+                    // Сохраняем боссбар
+                    playerData.bossBarsTempData.put(1L, sotaBossbar);
+                }
+
+                // Выставляем параметры боссбара для мобильной станции
+                if (!playerData.networkInfo.noService.get()) {
+
+                    // Основное
+                    String title = "&7[Phone] " + playerData.networkInfo.networkGeneration.get().displayName;
+
+                    // Отметка роуминга (Если есть)
+                    if (playerData.networkInfo.inRoaming.get()) {
+                        title += "(R)";
+                    }
+
+                    // Имя оператора
+                    title += "&r - " + playerData.networkInfo.currentStation.get().getName();
+
+                    sotaBossbar.setColor(playerData.networkInfo.networkGeneration.get().toBarColor());
+                    sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', title));
+                    sotaBossbar.setProgress(playerData.networkInfo.signalStrength.get() / 100);
+
+                } else {
+                    // если сети нет, то нет
+                    sotaBossbar.setColor(BarColor.WHITE);
+                    sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети."));
+                    sotaBossbar.setProgress(0);
+                }
+
+                // Вычисляем время итерации
+                playerData.lastIterationTime.set((int) (System.currentTimeMillis() - startTime));
+            }
+        };
+
+        // Запускаем каждые 20 тиков
+        br.runTaskTimerAsynchronously(getPlugin(), 20L, 20L);
     }
     public Plugin getPlugin() {
         return this;

@@ -3,68 +3,39 @@ version: '${project.version}'
 main: ru.yoricya.privat.sota.sotaandradio.SotaAndRadio
 api-version: 1.19
 commands:
-  delPasBlock:
-    description: Отметить блок как НЕ пропускающий сигнал
-    usage: /delPasBlock
-    permission: sotaradio.delpasblock
-
-  newPasBlock:
-    description: Отметить блок как пропускающий сигнал
-    usage: /newPasBlock
-    permission: sotaradio.newpasblock
-
-  savePasBlocks:
-    description: Сохранить PassBlocks список.
-    usage: /savePasBlocks
-    permission: sotaradio.savepasblocks
-
   newSota:
-    description: Новая сота
-    usage: /newSota <Имя> <Частота или Тип> <Мощность> <Коментарий>
+    description: Создает новую соту
     permission: sotaradio.newsota
 
   delSota:
-    description: Удалить соту
-    usage: /delSota <ID>
+    description: Удаляет соту
     permission: sotaradio.delsota
 
   nearSota:
     description: Соты поблизости
-    usage: /nearSota
     permission: sotaradio.nearsota
 
   userParams:
-    description: Параметры Пользователя
-    usage: /paramUser <Параметр> <Значение>
+    description: Параметры игрока
     permission: sotaradio.userparams
 
-  myOperator:
-    description: Установить оператора
-    usage: /myOperator <Имя>
-    permission: sotaradio.myoperator
+  infoMobileNetwork:
+    description: Инфо по текущей соте
+    permission: sotaradio.infomobilenetwork
 
   helpSota:
-    description: Инфо
-    usage: /helpSota
+    description: Инфо по командам
     permission: sotaradio.helpsota
 
-  setPhone:
-    description: setPhone
-    usage: /setPhone <Оператор> <Макс сеть> <Имя телефона>
-    permission: sotaradio.setphone
+  newPhone:
+    description: Создает телефон
+    permission: sotaradio.newphone
 
   infoPhone:
-    description: infoPhone
-    usage: /infoPhone
+    description: Информация о телефоне
     permission: sotaradio.infophone
 
   delPhone:
-    description: delPhone
-    usage: /delPhone
+    description: Удаляет телефон
     permission: sotaradio.delphone
-  rendermap:
-    description: rendermap
-    usage: /rendermap
-    permission: sotaradio.rendermap
-
 

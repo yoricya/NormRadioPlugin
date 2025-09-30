@@ -1,4 +1,4 @@
-package ru.yoricya.privat.sota.sotaandradio.v2;
+package ru.yoricya.privat.sota.sotaandradio.v2.Station;
 
 import org.bukkit.Location;
 import org.json.JSONArray;
@@ -15,6 +15,8 @@ import java.util.Random;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class StationDb {
     protected static BlockHardnessCache BlockHardnessCache = new BlockHardnessCache();
@@ -48,9 +50,15 @@ public class StationDb {
         JSONArray jsonArr = new JSONArray(jsonStr);
 
         // Проходимся по массиву десериализуя станции
-        jsonArr.forEach(jsObj -> {
-            if (jsObj instanceof JSONObject) {
-                addStation(Station.Deserialize((JSONObject) jsObj));
+        jsonArr.forEach(obj -> {
+            if (obj instanceof JSONObject jsObj) {
+                var data = Station.Deserialize(jsObj);
+
+                if (data != null) {
+                    addStation(data);
+                } else {
+                    Logger.getLogger(StationDb.class.getName()).log(Level.WARNING, "Can't deserialize station, because data is null! Station Db may be damaged?");
+                }
             }
         });
     }
@@ -75,7 +83,7 @@ public class StationDb {
 
                 // Проверяем уровень сигнала
                 var precent = station.getSignalPrecent(location);
-                if (precent == 0) {
+                if (precent <= 0) {
                     continue;
                 }
 

@@ -1,9 +1,10 @@
-package ru.yoricya.privat.sota.sotaandradio.v2;
+package ru.yoricya.privat.sota.sotaandradio.v2.Player;
 
 
 import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationDb;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PlayerDb {
     private final List<PlayerData> playerList = new ArrayList<>();
@@ -45,9 +48,16 @@ public class PlayerDb {
         JSONArray jsonArr = new JSONArray(jsonStr);
 
         // Проходимся по массиву десериализуя данные игроков
-        jsonArr.forEach(jsObj -> {
-            if (jsObj instanceof JSONObject) {
-                playerList.add(PlayerData.Deserialize((JSONObject) jsObj));
+        jsonArr.forEach(obj -> {
+            if (obj instanceof JSONObject jsObj) {
+                var data = PlayerData.Deserialize(jsObj);
+
+                if (data != null) {
+                    playerList.add(data);
+                } else {
+                    Logger.getLogger(StationDb.class.getName()).log(Level.WARNING, "Can't deserialize player, because data is null! Player Db may be damaged?");
+                }
+
             }
         });
     }
