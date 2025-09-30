@@ -191,7 +191,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             if (args.length < 4) {
                                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                         "&c&lНе все арги указаны!&r" +
-                                                "\n&e/newSota fmradio <Частота> <Мощность> <Имя> "));
+                                                "\n&e   /newSota fmradio <Частота> <Мощность> <Имя> "));
                                 return;
                             }
 
@@ -233,7 +233,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             if (args.length < 4) {
                                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                         "&c&lНе все арги указаны!" +
-                                                "\n&e/newSota tv <Частота> <Мощность> <Имя>"));
+                                                "\n&e   /newSota tv <Частота> <Мощность> <Имя>"));
                                 return;
                             }
 
@@ -269,7 +269,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             if (args.length < 4) {
                                 sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                         "&c&lНе все арги указаны!&r" +
-                                                "\n&e/newSota mobilebs <Имя соты> <Мощность> <Опции соты, формата 'key1:val1,val2;key2:val3,val4'> "));
+                                                "\n&e   /newSota mobilebs <Имя соты> <Мощность> <Опции соты, формата 'key1:val1,val2;key2:val3,val4'> "));
                                 return;
                             }
 
@@ -399,10 +399,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                         cb.append(ChatColor.translateAlternateColorCodes('&',"----------------------\n"));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"&lID: "+stationResult.station.id));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n&r  Name: "+stationResult.station.getName()));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  Signal: "+stationResult.signalPrecent +"%"));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  Distance: "+Math.round(stationResult.station.stationLocation.distance(player_location)) +" blocks"));
-                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &l&nClick to copy ID."));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n&r   Name: "+stationResult.station.getName()));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Signal: "+stationResult.signalPrecent +"%"));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Distance: "+Math.round(stationResult.station.stationLocation.distance(player_location)) +" blocks"));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n   &l&nClick to copy ID."));
 
                         sender.spigot().sendMessage(cb.build());
                     }
@@ -482,10 +482,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                 """
                                       &e&lЧто-то не то! Проверьте правильно ли вы вводите команды:&r
-                                        &noff_radio <true/false>&r (Отображение радиостанций)
-                                        &noff_tv <true/false>&r (Отображение TV станций)
-                                        &noff_wifi <true/false>&r (Отображение Wi-Fi сетей)
-                                        &noff_mobile <true/false>&r (Отображение мобильных сетей)"""));
+                                         &noff_radio <true/false>&r (Отображение радиостанций)
+                                         &noff_tv <true/false>&r (Отображение TV станций)
+                                         &noff_wifi <true/false>&r (Отображение Wi-Fi сетей)
+                                         &noff_mobile <true/false>&r (Отображение мобильных сетей)"""));
                     }
 
                     return;
@@ -495,22 +495,21 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 if (command.getName().equalsIgnoreCase("helpSota")) {
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                             "&a&n/helpSota&r&a - Показать этот список,"));
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &n/myOperator <Имя>&r - Установить оператора."));
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            " &n/userParam&r - Настройка параметров пользователя."));
+                            "   &n/userParam&r - Настройка параметров пользователя."));
                     if (sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/newSota&r - Создать новую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/delSota&r - Удалить соту"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &6&n/nearSota&r - Найти ближайшую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/newPhone&r - Создать новый телефон."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/delPhone&r - Удалить телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/newSota&r - Создать новую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/delSota&r - Удалить соту"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/nearSota&r - Найти ближайшую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/newPhone&r - Создать новый телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/delPhone&r - Удалить телефон."));
                     }
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &9&n/infoPhone&r - Информация о телефоне."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/infoPhone&r - Информация о телефоне."));
 
                     if (sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &b&n/infoMobileNetwork <id>&r - Информация о соте по ее ID."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork <id>&r - Информация о соте по ее ID."));
                     }
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &b&n/infoMobileNetwork&r - Информация о текущей соте."));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork&r - Информация о текущей соте."));
 
                     //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
                     //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
@@ -529,9 +528,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                     "&eЧто-то не то! Проверьте правильно ли вы вводите команды:\n  &n/newPhone <Имя телефона> <Параметры формата 'key1:val1,val2;key2:val3,val4'>"));
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "  &aВ имени телефона поддерживаются управляющие символы '&n&'&r&a которые делают текст цветным! &cНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
+                                    "   &aВ имени телефона поддерживаются управляющие символы '&n&'&r&a которые делают текст цветным! &cНО ПРОБЕЛЫ НЕ ДОПУСКАЮТСЯ.&r"));
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                                    "  &cНБТ Теги телефона наложатся на предмет в вашей руке!"));
+                                    "   &cНБТ Теги телефона наложатся на предмет в вашей руке!"));
                         return;
                     }
 
@@ -696,42 +695,31 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     // MCC
-                    StringJoiner mccStrJoiner = new StringJoiner(", ");
-                    mccStrJoiner.add("Поддерживаемые MCC:");
-                    for (Integer mcc : phone.supportMcc) {
-                        mccStrJoiner.add(mcc.toString());
-                    }
-                    String mccSupports = mccStrJoiner.toString();
+                    String mccSupports = "\n   Поддерживаемые MCC: " + phone.supportMcc.stream()
+                            .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // MNC
-                    StringJoiner mncStrJoiner = new StringJoiner(", ");
-                    mncStrJoiner.add("Поддерживаемые MNC:");
-                    for (Integer mnc : phone.supportMnc) {
-                        mncStrJoiner.add(mnc.toString());
-                    }
-                    String mncSupports = mncStrJoiner.toString();
+                    String mncSupports = "\n   Поддерживаемые MNC: " + phone.supportMnc.stream()
+                            .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // Supported Networks
-                    StringJoiner networkStrJoiner = new StringJoiner(", ");
-                    networkStrJoiner.add("Поддерживаемые сети:");
-                    for (CellularNetworkConfig.Generation network : phone.supportNetworks) {
-                        networkStrJoiner.add(network.toStr());
-                    }
-                    String networkSupports = networkStrJoiner.toString();
+                    String networkSupports = "\n   Поддерживаемые сети: " + phone.supportNetworks.stream()
+                            .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // Roaming Policy
                     String roamingPolicy = "";
                     if (phone.allowRoamingPolicy) {
-                        roamingPolicy = "\n  Устройство может подключатся в роуминге.";
+                        roamingPolicy = "\n   &eУстройство может подключатся в роуминге.&r";
                     }
 
                     // Send message
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "&aИнформация о телефоне:&r" +
-                                    "\n  imei: " + phone.phoneImei +
-                                    "\n  " + mccSupports +
-                                    "\n  " + mncSupports +
-                                    "\n  " + networkSupports + roamingPolicy));
+                            "&a&lИнформация о телефоне:&r" +
+                                    "\n   IMEI: " + phone.phoneImei +
+                                    "\n   " + mccSupports +
+                                    "\n   " + mncSupports +
+                                    "\n   " + networkSupports
+                                    + roamingPolicy));
                     return;
                 }
 
@@ -831,7 +819,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eСота не разрешает внутренний роуминг."));
                     }
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n  &l&nClick to copy ID '" + playerData.networkInfo.currentStation.get().id + "'."));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   &nClick to copy ID '" + playerData.networkInfo.currentStation.get().id + "'."));
 
                     sender.spigot().sendMessage(cb.build());
 
