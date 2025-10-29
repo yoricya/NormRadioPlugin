@@ -9,7 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationsDb;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -24,11 +24,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class PhoneDb {
+public class PhonesDb {
     private final List<PhoneData> phoneList = new ArrayList<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final File pathToDb;
-    public PhoneDb(File pathToDb) {
+    public PhonesDb(File pathToDb) {
         this.pathToDb = pathToDb;
 
         // Если файла db нет - создаем
@@ -62,7 +62,7 @@ public class PhoneDb {
                 if (data != null) {
                     phoneList.add(data);
                 } else {
-                    Logger.getLogger(StationDb.class.getName()).log(Level.WARNING, "Can't deserialize phone, because data is null! Phone Db may be damaged?");
+                    Logger.getLogger(StationsDb.class.getName()).log(Level.WARNING, "Can't deserialize phone, because data is null! Phone Db may be damaged?");
                 }
             }
         });

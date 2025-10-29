@@ -18,12 +18,12 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class StationDb {
+public class StationsDb {
     protected static BlockHardnessCache BlockHardnessCache = new BlockHardnessCache();
     private final List<Station> stationList = new ArrayList<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final File pathToDb;
-    public StationDb(File pathToDb) {
+    public StationsDb(File pathToDb) {
         this.pathToDb = pathToDb;
 
         // Если файла db нет - создаем
@@ -57,7 +57,7 @@ public class StationDb {
                 if (data != null) {
                     addStation(data);
                 } else {
-                    Logger.getLogger(StationDb.class.getName()).log(Level.WARNING, "Can't deserialize station, because data is null! Station Db may be damaged?");
+                    Logger.getLogger(StationsDb.class.getName()).log(Level.WARNING, "Can't deserialize station, because data is null! Station Db may be damaged?");
                 }
             }
         });

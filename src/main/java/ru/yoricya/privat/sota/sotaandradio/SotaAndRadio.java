@@ -14,7 +14,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -23,9 +22,9 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 
 import ru.yoricya.privat.sota.sotaandradio.v2.*;
 import ru.yoricya.privat.sota.sotaandradio.v2.Phone.PhoneData;
-import ru.yoricya.privat.sota.sotaandradio.v2.Phone.PhoneDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Phone.PhonesDb;
 import ru.yoricya.privat.sota.sotaandradio.v2.Player.PlayerData;
-import ru.yoricya.privat.sota.sotaandradio.v2.Player.PlayerDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Player.PlayersDb;
 import ru.yoricya.privat.sota.sotaandradio.v2.Station.*;
 
 import java.io.File;
@@ -40,13 +39,16 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public final class SotaAndRadio extends JavaPlugin implements Listener {
+    // Version
+    public static final String VERSION = "2.0.a251029";
+    public static final int API_VERSION = 1;
 
     // Db's
-    public static StationDb stationDb;
-    public static PlayerDb playerDb;
-    public static PhoneDb phoneDb;
+    private static StationsDb stationsDb;
+    private static PlayersDb playersDb;
+    private static PhonesDb phonesDb;
 
-    static final Logger logger = Logger.getLogger("Sota&Radio Plugin");
+    private static final Logger logger = Logger.getLogger("Sota&Radio Plugin");
     public static final AtomicLong currentTick = new AtomicLong(0); // Аналог currentTimeMillis
     static final ForkJoinPool ThreadPool = new ForkJoinPool();
 
@@ -64,13 +66,13 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         phonesDbLoader(startTime);
 
         if (!getServer().getOnlinePlayers().isEmpty()) for (Player player : getServer().getOnlinePlayers()){
-            var playerData = playerDb.loadPlayer(player);
+            var playerData = playersDb.loadPlayer(player);
             if (!playerData.isInit()){
                 onPlayerJoin(new PlayerJoinEvent(player, null));
             }
         }
 
-        getServer().getScheduler().runTaskTimerAsynchronously(getPlugin(), this::saveAllData, 1000L, 1000L);
+        getServer().getScheduler().runTaskTimerAsynchronously(SotaAndRadio.this, this::saveAllData, 1000L, 1000L);
         getServer().getPluginManager().registerEvents(this, this);
 
         // Таймер считающий количество прошедших тиков
@@ -79,7 +81,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         logger.log(Level.INFO, "Plugin initializing done with "+(System.currentTimeMillis() - startTime)+" ms.");
     }
 
-    void stationsDbLoader(long plStartTime) {
+    private void stationsDbLoader(long plStartTime) {
         logger.log(Level.INFO, "Loading stationsDb.");
         long startTime = System.currentTimeMillis();
 
@@ -94,7 +96,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
         // Load Db
         try {
-            stationDb = new StationDb(dbFile);
+            stationsDb = new StationsDb(dbFile);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -102,7 +104,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }
     }
 
-    void playersDbLoader(long plStartTime) {
+    public PhonesDb getPhonesDb() {
+        return phonesDb;
+    }
+
+    private void playersDbLoader(long plStartTime) {
         logger.log(Level.INFO, "Loading playersDb.");
         long startTime = System.currentTimeMillis();
 
@@ -116,7 +122,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }
 
         try {
-            playerDb = new PlayerDb(dbFile);
+            playersDb = new PlayersDb(dbFile);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
@@ -124,7 +130,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }
     }
 
-    void phonesDbLoader(long plStartTime) {
+    public PlayersDb getPlayersDb() {
+        return playersDb;
+    }
+
+    private void phonesDbLoader(long plStartTime) {
         logger.log(Level.INFO, "Loading phonesDb.");
         long startTime = System.currentTimeMillis();
 
@@ -138,11 +148,28 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         }
 
         try {
-            phoneDb = new PhoneDb(dbFile);
+            phonesDb = new PhonesDb(dbFile);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
             logger.log(Level.INFO, "Loading phonesDb done with "+(System.currentTimeMillis() - startTime)+"ms.");
+        }
+    }
+
+    public PhonesDb getPhoneDb() {
+        return phonesDb;
+    }
+
+    private final Semaphore saveDataSemaphore = new Semaphore(1);
+    public void saveAllData() {
+        try {
+            saveDataSemaphore.acquire();
+            
+            stationsDb.saveDb();
+            playersDb.saveDb();
+            phonesDb.saveDb();
+        } catch (InterruptedException ignore) {} finally {
+            saveDataSemaphore.release();
         }
     }
 
@@ -156,12 +183,6 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         logger.log(Level.INFO, "Data saved with "+(System.currentTimeMillis() - startTime)+"ms.");
     }
 
-    void saveAllData() {
-        stationDb.saveDb();
-        playerDb.saveDb();
-        phoneDb.saveDb();
-    }
-
     @Override
     public boolean onCommand(@NonNull CommandSender sender, @NonNull Command command,  @NonNull String label, @NonNull String[] args) {
         ThreadPool.execute(() -> {
@@ -172,7 +193,35 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
             try {
 
+                // Информация о плагине - /sotaandradio
+                // ------------------------------------------------------------
+                if (command.getName().equalsIgnoreCase("sotaandradio") || command.getName().equalsIgnoreCase("helpSota")) {
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('$',
+                            "$b$lSota$r&$eRadio$r&b Core Plugin - v" + VERSION + "$r$7$b (api " + API_VERSION + ")"));
+
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                            "   &a&n/sotaandradio&r&a - Показать этот список,"));
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                            "   &n/userParam&r - Настройка параметров пользователя."));
+                    if (sender.isOp()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/newSota&r - Создать новую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/delSota&r - Удалить соту"));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/nearSota&r - Найти ближайшую соту."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/newPhone&r - Создать новый телефон."));
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/delPhone&r - Удалить телефон."));
+                    }
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/infoPhone&r - Информация о телефоне."));
+
+                    if (sender.isOp()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork <id>&r - Информация о соте по ее ID."));
+                    }
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork&r - Информация о текущей соте."));
+
+                    return;
+                }
+
                 // Создать соту - /newSota <Тип>
+                // ------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("newSota")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду может выполнять только игрок!");
@@ -219,7 +268,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
 
                             // Генерируем ID
-                            id_of_station = stationDb.randomId();
+                            id_of_station = stationsDb.randomId();
 
                             // Создаем станцию
                             FMStation station = new FMStation();
@@ -230,7 +279,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             station.name = args[3];
 
                             // Добавляем станцию
-                            stationDb.addStation(station);
+                            stationsDb.addStation(station);
                         }
                         case "tv" -> {
                             // Tv Radio - /newSota tv <Freq> <Power> <Name>
@@ -255,7 +304,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
 
                             // Генерируем ID
-                            id_of_station = stationDb.randomId();
+                            id_of_station = stationsDb.randomId();
 
                             // Создаем станцию
                             TVStation station = new TVStation();
@@ -266,7 +315,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             station.name = args[3];
 
                             // Добавляем станцию
-                            stationDb.addStation(station);
+                            stationsDb.addStation(station);
                         }
                         case "mobilebs" -> {
                             // Mobile Base Station - /newSota mobilebs <Sota name> <Power> <Options>
@@ -292,7 +341,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             MobileBaseStation mobileBaseSattion = new MobileBaseStation();
 
                             // Генерируем ID
-                            id_of_station = stationDb.randomId();
+                            id_of_station = stationsDb.randomId();
 
                             mobileBaseSattion.stationLocation = ((Player) sender).getLocation().clone();
                             mobileBaseSattion.id = id_of_station;
@@ -300,8 +349,8 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             mobileBaseSattion.name = args[1];
 
                             // Получаем направление куда смотрит игрок, чтобы сопоставить с направлением антенны (На будущее (Я не уверен, что эта строка правильна, её писал гемини))
-                            // P.s это есть только у мобильных сот, так как в ирл, как правило, именно мобильные бс устанавливаются с учетом направления антены
-                            // для FM радиостанций направление антены по сути не имеет смысла
+                            // P.s это есть только у мобильных сот, так как в ирл, как правило, именно мобильные бс устанавливаются с учетом направления антенны
+                            // для FM радиостанций направление антенны по сути не имеет смысла
                             mobileBaseSattion.antennaDirection = (int) ((((Player) sender).getLocation().getYaw() % 360 + 360) % 360);
 
                             // Парсим опции
@@ -332,7 +381,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             }
 
                             // Добавляем станцию
-                            stationDb.addStation(mobileBaseSattion);
+                            stationsDb.addStation(mobileBaseSattion);
                         }
                     }
 
@@ -365,6 +414,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Удалить соту
+                // ------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("delSota")) {
                     if (args.length < 1 || !isNum(args[0])) {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&c&lНе все аргументы указаны!"));
@@ -373,7 +423,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     var id = Long.parseLong(args[0]);
-                    if (stationDb.removeStation(id))
+                    if (stationsDb.removeStation(id))
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eСота удалена!"));
                     else
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eСота не существует!"));
@@ -382,6 +432,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Ближайшие соты
+                // -------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("nearsota")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cЭту команду можно выполнять только от игрока!"));
@@ -390,7 +441,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
                     var player_location = ((Player) sender).getLocation().clone();
 
-                    List<StationDb.NearStationResult> listOfStations = stationDb.nearStations(player_location, station -> true);
+                    List<StationsDb.NearStationResult> listOfStations = stationsDb.nearStations(player_location, station -> true);
 
                     if (listOfStations.isEmpty()) {
                         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&cБлижайших к вам сот нет."));
@@ -403,7 +454,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                             "\n\n&a&lБлижайшие к вам соты:"));
 
-                    for (StationDb.NearStationResult stationResult : listOfStations) {
+                    for (StationsDb.NearStationResult stationResult : listOfStations) {
                         ComponentBuilder cb = new ComponentBuilder();
                         cb.event(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, String.valueOf(stationResult.station.id)));
 
@@ -422,6 +473,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Управление параметрами пользователя - /userParams <parameter> <value>
+                // ---------------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("userParams")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
@@ -439,7 +491,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         value = args[1];
                     }
 
-                    PlayerData playerData = playerDb.loadPlayer(((Player) sender));
+                    PlayerData playerData = playersDb.loadPlayer(((Player) sender));
 
                     // Параметр отключающий за обнаружение радио вышек
                     if (param.equalsIgnoreCase("off_radio")) {
@@ -478,7 +530,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (param.equalsIgnoreCase("fm")) {
 
                         // Получаем данные телефона
-                        var phoneData = phoneDb.getPhoneData(getPlugin(), ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
+                        var phoneData = phonesDb.getPhoneData(SotaAndRadio.this, ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
 
                         // Проверяем есть ли у игрока вообще телефон в руке
                         if (phoneData == null) {
@@ -525,33 +577,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     return;
                 }
 
-                //cmd
-                if (command.getName().equalsIgnoreCase("helpSota")) {
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "&a&n/helpSota&r&a - Показать этот список,"));
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                            "   &n/userParam&r - Настройка параметров пользователя."));
-                    if (sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/newSota&r - Создать новую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/delSota&r - Удалить соту"));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &6&n/nearSota&r - Найти ближайшую соту."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/newPhone&r - Создать новый телефон."));
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/delPhone&r - Удалить телефон."));
-                    }
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &9&n/infoPhone&r - Информация о телефоне."));
-
-                    if (sender.isOp()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork <id>&r - Информация о соте по ее ID."));
-                    }
-                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "   &b&n/infoMobileNetwork&r - Информация о текущей соте."));
-
-                    //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/newMark&r&l - Создать маркер на динамической карте."));
-                    //sender.sendMessage(ChatColor.translateAlternateColorCodes('&', " &d&l&n/delMark&r&l - Удалить маркер на динамической карте."));
-                    return;
-                }
-
                 // Создает "Телефон" /setPhone <Phone name> <Other params>
                 // Other params: net:gsm,gprs,edge,cdma,hspa,hspa+,lte;mcc:250,251;mnc:001,002;allowRoaming:true
+                // ---------------------------------------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("newPhone")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
@@ -642,11 +670,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     metaInHand.setLore(phoneLore);
 
                     // Создаем телефон в БД
-                    PhoneData legalPhone = phoneDb.makePhoneData();
+                    PhoneData legalPhone = phonesDb.makePhoneData();
                     legalPhone.fromWithoutImei(phoneData);
 
                     // Активируем телефон
-                    dataContainer.set(new NamespacedKey(getPlugin(), "imei"),
+                    dataContainer.set(new NamespacedKey(SotaAndRadio.this, "imei"),
                             PersistentDataType.LONG, legalPhone.phoneImei);
 
                     // Мб не нужно, но на всякий случай применяем мету к item-у.
@@ -658,6 +686,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Не только деактивирует, но еще и удаляет телефон из базы
+                // -------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("delPhone")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
@@ -678,7 +707,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     PersistentDataContainer dataContainer = metaInHand.getPersistentDataContainer();
 
                     // Получаем IMEI из метатега
-                    var phoneIsActiveNamespacedKey = new NamespacedKey(getPlugin(), "imei");
+                    var phoneIsActiveNamespacedKey = new NamespacedKey(SotaAndRadio.this, "imei");
                     Long imei = dataContainer.get(phoneIsActiveNamespacedKey, PersistentDataType.LONG);
                     if (imei == null) {
                         // Если он пустой значит это не телефон
@@ -689,10 +718,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     metaInHand.setLore(null);
 
                     // Удаляем из бд
-                    phoneDb.removePhoneData(imei);
+                    phonesDb.removePhoneData(imei);
 
                     // Удаляем IMEI из метатегов тем самым деактивируя телефон
-                    dataContainer.remove(new NamespacedKey(getPlugin(), "imei"));
+                    dataContainer.remove(new NamespacedKey(SotaAndRadio.this, "imei"));
 
                     // Мб не нужно, но на всякий случай
                     itemInHand.setItemMeta(metaInHand);
@@ -703,6 +732,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Информация о телефоне
+                // --------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("infoPhone")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
@@ -720,7 +750,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     // Извлекаем инфу о телефоне
-                    PhoneData phone = phoneDb.getPhoneData(getPlugin(), metaInHand);
+                    PhoneData phone = phonesDb.getPhoneData(SotaAndRadio.this, metaInHand);
 
                     // Проверяем, а телефон ли это и активирован ли
                     if (phone == null){
@@ -758,6 +788,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                 }
 
                 // Информация о соте
+                // ----------------------------------------------------------------------
                 if (command.getName().equalsIgnoreCase("infoMobileNetwork")) {
                     if (!(sender instanceof Player)) {
                         sender.sendMessage("Эту команду можно выполнять только от игрока!");
@@ -777,7 +808,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         }
 
                         // Получааем саму соту
-                        if (stationDb.getStation(id) instanceof MobileBaseStation station) {
+                        if (stationsDb.getStation(id) instanceof MobileBaseStation station) {
 
                             var text = "&a&lИнформация о соте '" + id + "':&r";
 
@@ -815,7 +846,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     // Получаем информацию о текущей соте с телефона
 
                     // Получаем данные телефона
-                    var phoneData = phoneDb.getPhoneData(getPlugin(), ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
+                    var phoneData = phonesDb.getPhoneData(SotaAndRadio.this, ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
 
                     // Проверяем есть ли у игрока вообще телефон в руке
                     if (phoneData == null) {
@@ -824,7 +855,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     // Получаем информацию о сети
-                    var netwInfo = phoneData.getPhoneService(((Player) sender), stationDb);
+                    var netwInfo = phoneData.getPhoneService(((Player) sender), stationsDb);
 
                     // Проверяем если ли вообще у игрока сеть
                     if (!netwInfo.inService.get()) {
@@ -871,6 +902,44 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     return;
                 }
 
+                // Поиск FM станций
+                // ----------------------------------------------------------------------
+                if (command.getName().equalsIgnoreCase("rdssearch")) {
+
+                    // Получаем данные телефона
+                    var phoneData = phonesDb.getPhoneData(SotaAndRadio.this, ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
+
+                    // Проверяем есть ли у игрока вообще телефон в руке
+                    if (phoneData == null) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eВозьмите в руку телефон."));
+                        return;
+                    }
+
+                    // Получаем позицию игрока
+                    var location = ((Player) sender).getLocation().clone();
+
+                    // Прибавляем единичку ибо считаем уровень сигнала от головы игрока
+                    location.setY(location.getY() + 1);
+
+                    // Ищем ближайшие станции
+                    var fmlist = phoneData.searchFmStations(location, stationsDb);
+
+                    // Выводим результат
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&l&bRDS Result:"));
+
+                    for (var fmResult: fmlist) {
+                        var fmstation = (FMStation) fmResult.station;
+
+                        ComponentBuilder cb = new ComponentBuilder();
+                        cb.event(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/userparams fm " + fmstation.frequency));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"    " + fmstation.name + " &n(" + fmstation.frequency + ")&r - " + fmResult.signalPrecent + "%"));
+
+                        sender.spigot().sendMessage(cb.build());
+                    }
+
+                    sender.sendMessage(ChatColor.translateAlternateColorCodes('&',"&bClick on line to tune FM receiver."));
+                }
+
             } catch (Exception e) {
                 var tm = (int) (System.currentTimeMillis() / 10000);
                 logger.log(Level.WARNING, "Exception error id - '" + tm + "'. ", e);
@@ -894,7 +963,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
 
         // Инициализируем игрока в playerDb
-        PlayerData playerData = playerDb.loadPlayer(player);
+        PlayerData playerData = playersDb.loadPlayer(player);
         playerData.init(player);
 
         // Ячейки для хранения координатов игрока
@@ -949,7 +1018,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         itemInPlayerHand.set(item);
 
                         // Если игрок взял другой предмет - то парсим этот предмет на наличие метатегов телефона, и ложим в Atomic переменную.
-                        phoneInPlayerHand.set(phoneDb.getPhoneData(getPlugin(), item.getItemMeta()));
+                        phoneInPlayerHand.set(phonesDb.getPhoneData(SotaAndRadio.this, item.getItemMeta()));
 
                     }
 
@@ -991,7 +1060,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     if (!playerData.paramOffMobile.get()) {
 
                         // Получаем данные сотовой сети телефона
-                        var netwInfo = phoneInPlayerHand.get().getPhoneService(playerLocationOfHead, stationDb);
+                        var netwInfo = phoneInPlayerHand.get().getPhoneService(playerLocationOfHead, stationsDb);
 
                         // Получаем боссбар для соты
                         var sotaBossbar = playerData.bossBarsTempData.get(1L);
@@ -1036,10 +1105,10 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     // FM _____________________________________
                     // Смотрим по параметрам юзера, включены ли FM станции
                     // если да то обрабатываем их
-                    if (playerData.paramOffRadio.get()) {
+                    if (!playerData.paramOffRadio.get()) {
 
                         // Получаем состояние FM приемника
-                        var fmInfo = phoneInPlayerHand.get().getFmStation(playerLocationOfHead, stationDb);
+                        var fmInfo = phoneInPlayerHand.get().getFmStation(playerLocationOfHead, stationsDb);
 
                         // Получаем боссбар для FM
                         var fmBossBar = playerData.bossBarsTempData.get(2L);
@@ -1073,7 +1142,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                                 fmBossBar.setProgress(0);
                             }
 
-                        } else if (!fmBossBar.getPlayers().isEmpty()) { // Если приемник выключен а у пользователя все еще есть боссбар
+                        } else if (!fmBossBar.getPlayers().isEmpty()) { // Если приемник выключен, а у пользователя все еще есть боссбар
 
                             // Удаляем его
                             fmBossBar.removeAll();
@@ -1091,11 +1160,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         };
 
         // Запускаем каждые 10 тиков
-        br.runTaskTimerAsynchronously(getPlugin(), 5L, 5L);
-    }
-
-    public Plugin getPlugin() {
-        return this;
+        br.runTaskTimerAsynchronously(SotaAndRadio.this, 5L, 5L);
     }
 
 }

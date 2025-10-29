@@ -7,7 +7,7 @@ import org.json.JSONObject;
 import ru.yoricya.privat.sota.sotaandradio.v2.CellularNetworkConfig;
 import ru.yoricya.privat.sota.sotaandradio.v2.Station.FMStation;
 import ru.yoricya.privat.sota.sotaandradio.v2.Station.MobileBaseStation;
-import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationsDb;
 import ru.yoricya.privat.sota.sotaandradio.v2.TickCacheRecord;
 
 import java.util.*;
@@ -109,15 +109,15 @@ public class PhoneData {
 
 
         // FM Frequencies
-        if (jsonObj.has("min_fm_sp_freq") && jsonObj.get("min_fm_sp_freq") instanceof Float min_freq) {
-            phoneData.minSupportFmFrequency = min_freq;
+        if (jsonObj.has("min_fm_sp_freq") && jsonObj.get("min_fm_sp_freq") instanceof Number min_freq) {
+            phoneData.minSupportFmFrequency = min_freq.floatValue();
         } else {
             Logger.getLogger(PhoneData.class.getName())
                     .log(Level.WARNING, "Phone IMEI: " + phoneData.phoneImei + " - Cannot deserialize minSupportFmFrequency.");
         }
 
-        if (jsonObj.has("max_fm_sp_freq") && jsonObj.get("max_fm_sp_freq") instanceof Float max_freq) {
-            phoneData.maxSupportFmFrequency = max_freq;
+        if (jsonObj.has("max_fm_sp_freq") && jsonObj.get("max_fm_sp_freq") instanceof Number max_freq) {
+            phoneData.maxSupportFmFrequency = max_freq.floatValue();
         } else {
             Logger.getLogger(PhoneData.class.getName())
                     .log(Level.WARNING, "Phone IMEI: " + phoneData.phoneImei + " - Cannot deserialize maxSupportFmFrequency.");
@@ -181,23 +181,23 @@ public class PhoneData {
     public TickCacheRecord<NetworkInfo> currentNetworkInfo = new TickCacheRecord<>(20, new NetworkInfo());
 
     // Получаем кеш либо вычисляем
-    public NetworkInfo getPhoneService(Player phoneSender, StationDb stationDb) {
+    public NetworkInfo getPhoneService(Player phoneSender, StationsDb stationsDb) {
         var location = phoneSender.getLocation().clone();
         location.setY(location.getY() + 1);
-        return getPhoneService(location, stationDb);
+        return getPhoneService(location, stationsDb);
     }
 
-    public NetworkInfo getPhoneService(Location phoneLocation, StationDb stationDb) {
+    public NetworkInfo getPhoneService(Location phoneLocation, StationsDb stationsDb) {
         return currentNetworkInfo.get((old) -> {
-            old.from(searchService(phoneLocation, stationDb));
+            old.from(searchService(phoneLocation, stationsDb));
             return old;
         });
     }
 
-    private NetworkInfo searchService(Location phoneLocation, StationDb stationDb) {
+    private NetworkInfo searchService(Location phoneLocation, StationsDb stationsDb) {
 
         // Пред-обработка (фильтрация перед расчетом сигнала)
-        var nerbyList = stationDb.nearStations(phoneLocation, (station) -> {
+        var nerbyList = stationsDb.nearStations(phoneLocation, (station) -> {
 
             // Если это не мобильная станция, то оно не нужно нам
             if (!(station instanceof MobileBaseStation mobileBaseStation)) {
@@ -227,7 +227,7 @@ public class PhoneData {
         NetworkInfo tempNetworkInfo = new NetworkInfo();
 
         // Пост-обработка (выбор лучшей сети после расчета сигнала)
-        for (StationDb.NearStationResult nearResult: nerbyList) {
+        for (StationsDb.NearStationResult nearResult: nerbyList) {
 
             MobileBaseStation station = (MobileBaseStation) nearResult.station;
 
@@ -336,13 +336,13 @@ public class PhoneData {
     }
 
     // Получаем кеш либо вычисляем
-    public FMInfo getFmStation(Player phoneSender, StationDb stationDb) {
+    public FMInfo getFmStation(Player phoneSender, StationsDb stationsDb) {
         var location = phoneSender.getLocation().clone();
         location.setY(location.getY() + 1);
-        return getFmStation(location, stationDb);
+        return getFmStation(location, stationsDb);
     }
 
-    public FMInfo getFmStation(Location phoneLocation, StationDb stationDb) {
+    public FMInfo getFmStation(Location phoneLocation, StationsDb stationsDb) {
         return currentFmStation.get((old) -> {
 
             // Если нолик - то приемник выключен
@@ -358,17 +358,17 @@ public class PhoneData {
             }
 
             // Иначе делаем вычисления и записываем в инфо новые данные
-            old.from(searchFmStation(phoneLocation, stationDb));
+            old.from(searchFmStation(phoneLocation, stationsDb));
 
             return old;
         });
     }
 
     // Вычисляем без кеша
-    private FMInfo searchFmStation(Location phoneLocation, StationDb stationDb) {
+    private FMInfo searchFmStation(Location phoneLocation, StationsDb stationsDb) {
 
         // Пред-обработка (фильтрация перед расчетом сигнала)
-        var nerbyList = stationDb.nearStations(phoneLocation, (station) -> {
+        var nerbyList = stationsDb.nearStations(phoneLocation, (station) -> {
 
             // Если это не FM станция, то оно не нужно нам
             if (!(station instanceof FMStation fmStation)) {
@@ -389,7 +389,7 @@ public class PhoneData {
         tempFmInfo.isReceiverOn.set(true);
 
         // Пост обработка
-        for (StationDb.NearStationResult nearResult: nerbyList) {
+        for (StationsDb.NearStationResult nearResult: nerbyList) {
 
             // Если предыдущая станция мощнее - то естественно она перебивает сигнал следующей, поэтому скип
             if (tempFmInfo.fmStation.get() != null && tempFmInfo.signalStrength.get() > nearResult.signalPrecent) {
@@ -401,6 +401,20 @@ public class PhoneData {
         }
 
         return tempFmInfo;
+    }
+
+    // Ищем все станции в зоне видимости
+    public List<StationsDb.NearStationResult> searchFmStations(Location phoneLocation, StationsDb stationsDb) {
+        return stationsDb.nearStations(phoneLocation, (station) -> {
+
+            // Если это не FM станция, то оно не нужно нам
+            if (!(station instanceof FMStation fmStation)) {
+                return false;
+            }
+
+            // Если частота станции не входит в поддерживаемый приемником диапазон - то скипаем её
+            return !(fmStation.frequency < minSupportFmFrequency || fmStation.frequency > maxSupportFmFrequency);
+        });
     }
 
 }

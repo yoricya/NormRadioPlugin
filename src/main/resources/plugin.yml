@@ -3,6 +3,10 @@ version: '${project.version}'
 main: ru.yoricya.privat.sota.sotaandradio.SotaAndRadio
 api-version: 1.19
 commands:
+  sotaandradio:
+    description: Информация о плагине
+    permission: sotaradio
+
   newSota:
     description: Создает новую соту
     permission: sotaradio.newsota
@@ -38,4 +42,8 @@ commands:
   delPhone:
     description: Удаляет телефон
     permission: sotaradio.delphone
+
+  rdsSearch:
+    description: Поиск FM радио
+    permission: sotaradio.rdssearch
 

@@ -4,7 +4,7 @@ package ru.yoricya.privat.sota.sotaandradio.v2.Player;
 import org.bukkit.entity.Player;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationDb;
+import ru.yoricya.privat.sota.sotaandradio.v2.Station.StationsDb;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,11 +17,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class PlayerDb {
+public class PlayersDb {
     private final List<PlayerData> playerList = new ArrayList<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final File pathToDb;
-    public PlayerDb(File pathToDb) {
+    public PlayersDb(File pathToDb) {
         this.pathToDb = pathToDb;
 
         // Если файла db нет - создаем
@@ -55,7 +55,7 @@ public class PlayerDb {
                 if (data != null) {
                     playerList.add(data);
                 } else {
-                    Logger.getLogger(StationDb.class.getName()).log(Level.WARNING, "Can't deserialize player, because data is null! Player Db may be damaged?");
+                    Logger.getLogger(StationsDb.class.getName()).log(Level.WARNING, "Can't deserialize player, because data is null! Player Db may be damaged?");
                 }
 
             }

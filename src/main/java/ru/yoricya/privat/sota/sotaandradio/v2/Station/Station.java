@@ -14,6 +14,7 @@ public abstract class Station {
     // Station id
     public long id;
 
+    // Направление антенны в градусах 0 - 360
     public @Nullable Integer antennaDirection;
 
     // Position
@@ -59,10 +60,10 @@ public abstract class Station {
                 jsonObject.getDouble("location_z"));
 
         // Десериализуем направление антенны
-        if (jsonObject.has("ant_direction") && jsonObject.get("ant_direction") instanceof Integer antDirection){
-            station.antennaDirection = antDirection;
-        } else {
-            getLogger().log(Level.WARNING, "Cant deserialize antDirection on station (id: " + id + "), db may be damaged");
+        if (jsonObject.has("ant_direction")){
+            if (jsonObject.get("ant_direction") instanceof Number antDirection) {
+                station.antennaDirection = antDirection.intValue();
+            }
         }
 
         // Дальнейшая десереализация
@@ -94,6 +95,7 @@ public abstract class Station {
         json.put("location_y", stationLocation.getY());
         json.put("location_z", stationLocation.getZ());
         json.put("location_w", stationLocation.getWorld().getName());
+        json.put("ant_direction", antennaDirection);
 
         return json;
     }
@@ -175,7 +177,7 @@ public abstract class Station {
             int y = Math.round(point1[1] + i * stepY);
             int z = Math.round(point1[2] + i * stepZ);
 
-            float hrdns = StationDb.BlockHardnessCache.get_block_hardness(x, y, z, world); //world.getBlockAt(x, y, z).getType().getHardness();
+            float hrdns = StationsDb.BlockHardnessCache.get_block_hardness(x, y, z, world); //world.getBlockAt(x, y, z).getType().getHardness();
 
             if(hrdns == 0)
                 continue;
