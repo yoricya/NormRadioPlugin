@@ -11,87 +11,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class PlayerData {
     @Nullable
     public Player player;
 
     public HashMap<Long, BossBar> bossBarsTempData = new HashMap<>();
-    public NetworkInfo networkInfo = new NetworkInfo();
-    private final NetworkInfo tempNetworkInfo = new NetworkInfo();
     public AtomicInteger lastIterationTime = new AtomicInteger(-1);
-
-    public void tempAcceptNetStation(MobileBaseStation station, float signalStrength, PhoneData phoneData) {
-
-        // Проверка MCC и MNC
-        boolean isMccDisjoint = Collections.disjoint(phoneData.supportMcc, station.supportMcc);
-        boolean isMncDisjoint = Collections.disjoint(phoneData.supportMnc, station.supportMnc);
-
-        // Если для подключения нужен роуминг (хотя бы один код не совпал)
-        if (isMccDisjoint || isMncDisjoint) {
-
-            // Если есть доступная сота и она без роуминга - то стоп, всегда в приоритете родная сеть
-            if (!tempNetworkInfo.noService.get() && !tempNetworkInfo.inRoaming.get()) {
-                return;
-            }
-
-            // Иначе проверяем разрешение на роуминг
-
-            // Требуется MCC-роуминг, и станция его не разрешает -> ОТКАЗ
-            if (isMccDisjoint && !station.allowMccRoaming) {
-                return;
-            }
-
-            // Требуется MNC-роуминг, и станция его не разрешает -> ОТКАЗ
-            if (isMncDisjoint && !station.allowMncRoaming) {
-                return;
-            }
-
-            // Если телефон не поддерживает роуминг (общая политика), но роуминг требуется -> ОТКАЗ
-            if (!phoneData.allowRoamingPolicy) {
-                return;
-            }
-
-        }
-
-
-        // Проверяем поколение и уровень сигнала сети
-        if (tempNetworkInfo.networkGeneration.get() != null) {
-
-            // Если у новой соты поколение сети меньше чем у предыдущей
-            if (station.getMaxSupportedGeneration().networkGeneration < tempNetworkInfo.networkGeneration.get().networkGeneration) {
-                // то скипаем новую
-                return;
-            }
-
-            // Если у новой соты поколение сети такое же как у предыдущей
-            if (station.getMaxSupportedGeneration().networkGeneration == tempNetworkInfo.networkGeneration.get().networkGeneration) {
-                // Но уровень сигнала меньше (Так же проверяем чтобы это была не одна и та же станция)
-                if (signalStrength < networkInfo.signalStrength.get() && station.id != networkInfo.currentStation.get().id) {
-                    // то скипаем новую
-                    return;
-                }
-            }
-
-        }
-
-
-        // Если мы дошли до сюда, значит сеть прошла отбор
-        tempNetworkInfo.signalStrength.set(signalStrength);
-        tempNetworkInfo.currentStation.set(station);
-        tempNetworkInfo.networkGeneration.set(station.getMaxSupportedGeneration());
-        tempNetworkInfo.noService.set(false);
-        tempNetworkInfo.inMccRoaming.set(isMccDisjoint);
-        tempNetworkInfo.inMncRoaming.set(isMncDisjoint);
-        tempNetworkInfo.inRoaming.set(isMccDisjoint || isMncDisjoint);
-    }
-
-    public void pushNetStation() {
-        networkInfo.from(tempNetworkInfo);
-        tempNetworkInfo.reset();
-    }
 
     public void init(Player player) {
         this.player = player;

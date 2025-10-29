@@ -105,4 +105,8 @@ public class MobileBaseStation extends Station {
 
         return json;
     }
+
+    public boolean canBeRegistered(PhoneData phoneData) {
+        return true;
+    }
 }

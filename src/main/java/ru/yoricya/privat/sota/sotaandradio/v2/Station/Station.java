@@ -3,6 +3,7 @@ package ru.yoricya.privat.sota.sotaandradio.v2.Station;
 import org.bukkit.Location;
 import org.json.JSONObject;
 
+import javax.annotation.Nullable;
 import java.util.logging.Level;
 
 import static org.bukkit.Bukkit.getLogger;
@@ -12,6 +13,8 @@ import static ru.yoricya.privat.sota.sotaandradio.php.rand;
 public abstract class Station {
     // Station id
     public long id;
+
+    public @Nullable Integer antennaDirection;
 
     // Position
     public Location stationLocation;
@@ -38,13 +41,15 @@ public abstract class Station {
             default -> null;
         };
 
+        var id = jsonObject.getLong("id");
+
         if (station == null) {
-            getLogger().log(Level.WARNING, "Unknown station type '" + stationType + "', db may be damaged");
+            getLogger().log(Level.WARNING, "Unknown station (id: " + id + ") type '" + stationType + "', db may be damaged");
             return null;
         }
 
         // Базовая десериализация
-        station.id = jsonObject.getLong("id");
+        station.id = id;
         station.power = jsonObject.getDouble("power");
 
         // Десериализауем локацию станции
@@ -52,6 +57,13 @@ public abstract class Station {
                 jsonObject.getDouble("location_x"),
                 jsonObject.getDouble("location_y"),
                 jsonObject.getDouble("location_z"));
+
+        // Десериализуем направление антенны
+        if (jsonObject.has("ant_direction") && jsonObject.get("ant_direction") instanceof Integer antDirection){
+            station.antennaDirection = antDirection;
+        } else {
+            getLogger().log(Level.WARNING, "Cant deserialize antDirection on station (id: " + id + "), db may be damaged");
+        }
 
         // Дальнейшая десереализация
         station.stationDeserialize(jsonObject);

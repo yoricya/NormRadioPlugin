@@ -32,6 +32,8 @@ import java.io.File;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,7 +47,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
     public static PhoneDb phoneDb;
 
     static final Logger logger = Logger.getLogger("Sota&Radio Plugin");
-
+    public static final AtomicLong currentTick = new AtomicLong(0); // Аналог currentTimeMillis
     static final ForkJoinPool ThreadPool = new ForkJoinPool();
 
     @Override
@@ -70,6 +72,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
 
         getServer().getScheduler().runTaskTimerAsynchronously(getPlugin(), this::saveAllData, 1000L, 1000L);
         getServer().getPluginManager().registerEvents(this, this);
+
+        // Таймер считающий количество прошедших тиков
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> currentTick.accumulateAndGet(1, Long::sum), 0, 1);
 
         logger.log(Level.INFO, "Plugin initializing done with "+(System.currentTimeMillis() - startTime)+" ms.");
     }
@@ -294,6 +299,11 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             mobileBaseSattion.power = power;
                             mobileBaseSattion.name = args[1];
 
+                            // Получаем направление куда смотрит игрок, чтобы сопоставить с направлением антенны (На будущее (Я не уверен, что эта строка правильна, её писал гемини))
+                            // P.s это есть только у мобильных сот, так как в ирл, как правило, именно мобильные бс устанавливаются с учетом направления антены
+                            // для FM радиостанций направление антены по сути не имеет смысла
+                            mobileBaseSattion.antennaDirection = (int) ((((Player) sender).getLocation().getYaw() % 360 + 360) % 360);
+
                             // Парсим опции
                             for (CellularNetworkConfig.Config config : CellularNetworkConfig.ParseParams(args[3])) {
                                 switch (config) {
@@ -402,6 +412,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         cb.append(ChatColor.translateAlternateColorCodes('&',"\n&r   Name: "+stationResult.station.getName()));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Signal: "+stationResult.signalPrecent +"%"));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Distance: "+Math.round(stationResult.station.stationLocation.distance(player_location)) +" blocks"));
+                        cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Power: "+stationResult.station.power +" w"));
                         cb.append(ChatColor.translateAlternateColorCodes('&',"\n   &l&nClick to copy ID."));
 
                         sender.spigot().sendMessage(cb.build());
@@ -461,6 +472,29 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
                                     "&aТекущее значение: "+playerData.paramOffMobile));
                         }
+                    } else
+
+                    // Параметр отвечающий за частоту FM приемника
+                    if (param.equalsIgnoreCase("fm")) {
+
+                        // Получаем данные телефона
+                        var phoneData = phoneDb.getPhoneData(getPlugin(), ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
+
+                        // Проверяем есть ли у игрока вообще телефон в руке
+                        if (phoneData == null) {
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eВозьмите в руку телефон."));
+                            return;
+                        }
+
+                        // Обработка
+                        if (value != null) {
+                            phoneData.setFmFrequency(Float.parseFloat(value));
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aПараметр изменен"));
+                        } else {
+                            sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                                    "&aТекущее значение: " + phoneData.currentFmFrequency.get()));
+                        }
+
                     } else
 
                     // Параметр отвечающий за обнаружение Wi-Fi сетей
@@ -663,7 +697,7 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     // Мб не нужно, но на всякий случай
                     itemInHand.setItemMeta(metaInHand);
 
-                    // *_Meta является экстремистской организацией на территории Российской Федерации в части продажи продуктов Facebook и Instagram._
+                    // _*Meta является экстремистской организацией на территории Российской Федерации в части продажи продуктов Facebook и Instagram._
 
                     return;
                 }
@@ -695,15 +729,15 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                     }
 
                     // MCC
-                    String mccSupports = "\n   Поддерживаемые MCC: " + phone.supportMcc.stream()
+                    String mccSupports = "Поддерживаемые MCC: " + phone.supportMcc.stream()
                             .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // MNC
-                    String mncSupports = "\n   Поддерживаемые MNC: " + phone.supportMnc.stream()
+                    String mncSupports = "Поддерживаемые MNC: " + phone.supportMnc.stream()
                             .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // Supported Networks
-                    String networkSupports = "\n   Поддерживаемые сети: " + phone.supportNetworks.stream()
+                    String networkSupports = "Поддерживаемые сети: " + phone.supportNetworks.stream()
                             .map(String::valueOf).collect(Collectors.joining(", ")) + ".";
 
                     // Roaming Policy
@@ -756,6 +790,8 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                             text += "\n   Поддержка сетей: " + station.supportGenerations.stream()
                                     .map(CellularNetworkConfig.Generation::toStr).collect(Collectors.joining(", ")) + ".";
 
+                            text += "\n   Мощность соты: " + station.power + "w.";
+
                             text += "\n   Имя сети: " + station.name + ".";
 
                             if (!station.allowMccRoaming) {
@@ -776,50 +812,59 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
                         return;
                     }
 
-                    // Получаем информацию о текущей соте игрока
+                    // Получаем информацию о текущей соте с телефона
 
-                    // Получаем данные игрока
-                    PlayerData playerData = playerDb.loadPlayer(((Player) sender));
+                    // Получаем данные телефона
+                    var phoneData = phoneDb.getPhoneData(getPlugin(), ((Player) sender).getInventory().getItemInMainHand().getItemMeta());
+
+                    // Проверяем есть ли у игрока вообще телефон в руке
+                    if (phoneData == null) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eВозьмите в руку телефон или передайте ID соты в аргументы команды."));
+                        return;
+                    }
+
+                    // Получаем информацию о сети
+                    var netwInfo = phoneData.getPhoneService(((Player) sender), stationDb);
 
                     // Проверяем если ли вообще у игрока сеть
-                    if (playerData.networkInfo.noService.get()) {
-                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eВы не подключены ни к одной сети!"));
+                    if (!netwInfo.inService.get()) {
+                        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "&eУстройство не подключено ни к одной сети."));
                         return;
                     }
 
                     ComponentBuilder cb = new ComponentBuilder();
 
-                    cb.event(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, String.valueOf(playerData.networkInfo.currentStation.get().id)));
+                    cb.event(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, String.valueOf(netwInfo.currentStation.get().id)));
 
                     cb.append(ChatColor.translateAlternateColorCodes('&',"&a&lИнформация о текущей соте:&r"));
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MCC: " + playerData.networkInfo.currentStation.get().supportMcc.stream()
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MCC: " + netwInfo.currentStation.get().supportMcc.stream()
                             .map(String::valueOf).collect(Collectors.joining(", ")) + "."));
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MNC: " + playerData.networkInfo.currentStation.get().supportMnc.stream()
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Поддержка MNC: " + netwInfo.currentStation.get().supportMnc.stream()
                             .map(String::valueOf).collect(Collectors.joining(", ")) + "."));
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Тип подключения: " + playerData.networkInfo.networkGeneration.get().description + "."));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Тип подключения: " + netwInfo.networkGeneration.get().description + "."));
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Уровень сети: " + playerData.networkInfo.signalStrength.get().intValue() + "%."));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Уровень сети: " + netwInfo.signalStrength.get().intValue() + "%."));
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Имя сети: " + playerData.networkInfo.currentStation.get().name + "."));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   Имя сети: " + netwInfo.currentStation.get().name + "."));
 
-                    if (playerData.networkInfo.inMccRoaming.get()) {
+                    if (netwInfo.inMccRoaming.get()) {
                         cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eМеждународный роуминг."));
-                    } else if (playerData.networkInfo.inMncRoaming.get()) {
+                    } else if (netwInfo.inMncRoaming.get()) {
                         cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eВнутренний роуминг."));
                     }
 
-                    if (!playerData.networkInfo.currentStation.get().allowMccRoaming) {
+                    if (!netwInfo.currentStation.get().allowMccRoaming) {
                         cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eСота не разрешает международный роуминг."));
                     }
 
-                    if (!playerData.networkInfo.currentStation.get().allowMncRoaming) {
+                    if (!netwInfo.currentStation.get().allowMncRoaming) {
                         cb.append(ChatColor.translateAlternateColorCodes('&', "\n   &eСота не разрешает внутренний роуминг."));
                     }
 
-                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   &nClick to copy ID '" + playerData.networkInfo.currentStation.get().id + "'."));
+                    cb.append(ChatColor.translateAlternateColorCodes('&',"\n   &nClick to copy ID '" + netwInfo.currentStation.get().id + "'."));
 
                     sender.spigot().sendMessage(cb.build());
 
@@ -855,6 +900,9 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         // Ячейки для хранения координатов игрока
         final int[] oldPlayerCords = {0, 0, 0};
 
+        // Для проверки завершилась ли задача
+        AtomicBoolean isTaskRunning = new AtomicBoolean(false);
+
         // Предмет в руке игрока
         AtomicReference<ItemStack> itemInPlayerHand = new AtomicReference<>(null);
 
@@ -865,285 +913,189 @@ public final class SotaAndRadio extends JavaPlugin implements Listener {
         BukkitRunnable br = new BukkitRunnable() {
             @Override
             public void run() {
-                var startTime = System.currentTimeMillis();
-
-                // Если игрок при новой итерации отключился
-                if (!player.isOnline()) {
-
-                    // Отменяем таску
-                    this.cancel();
-
-                    // Чистим кеш боссбаров
-                    playerData.bossBarsTempData.clear();
-
-                    // Деинициализируем
-                    playerData.deInit();
+                // Если предыдущая задача не завершилась, то не продолжаем
+                if (isTaskRunning.get()) {
                     return;
                 }
 
-                // Получаем предмет в руке игрока
-                var item = player.getInventory().getItemInMainHand();
-                if (!item.equals(itemInPlayerHand.get())) {
+                // 'Блокируем' выполнение следующей задачи
+                isTaskRunning.set(true);
 
-                    itemInPlayerHand.set(item);
+                // Выполняем код внутри
+                try{
 
-                    // Если игрок взял другой предмет - то парсим этот предмет на наличие метатегов телефона, и ложим в Atomic переменную.
-                    phoneInPlayerHand.set(phoneDb.getPhoneData(getPlugin(), item.getItemMeta()));
+                    var startTime = System.currentTimeMillis();
 
-                }
+                    // ЭТАП 0 (Подготовка) _____________________________________
 
-                // Если телефона в руке нет
-                if (phoneInPlayerHand.get() == null) {
+                    // Если игрок при новой итерации отключился
+                    if (!player.isOnline()) {
 
-                    // Чистим боссбары
-                    playerData.bossBarsTempData.entrySet().removeIf(entry -> {
-                        entry.getValue().removePlayer(player);
-                        return true;
-                    });
+                        // Отменяем таску
+                        this.cancel();
 
-                    // и незачем идти дальше
-                    return;
-                }
+                        // Чистим кеш боссбаров
+                        playerData.bossBarsTempData.clear();
 
-                // Получаем локацию
-                var playerLocation = player.getLocation().clone();
-
-                // Если игрок стоит на месте, то есть координаты одни и те же то скипаем итерацию
-                if (oldPlayerCords[0] == (int) playerLocation.getX() &&
-                        oldPlayerCords[1] == (int) playerLocation.getY() &&
-                        oldPlayerCords[2] == (int) playerLocation.getZ()) return;
-
-                // Иначе записываем новые корды
-                oldPlayerCords[0] = (int) playerLocation.getX();
-                oldPlayerCords[1] = (int) playerLocation.getY();
-                oldPlayerCords[2] = (int) playerLocation.getZ();
-
-                // Получаем локацию игрока
-                var playerLocationOfHead = playerLocation.clone();
-
-                // Считаем уровень сигнала от головы игрока
-                playerLocationOfHead.setY(playerLocation.getY() + 1);
-
-                // Ищем ближайшие соты
-                var stations_list = stationDb.nearStations(playerLocationOfHead, station -> {
-                    // Тут - пред-обработка, она выполняется до того как мы рассчитаем уровень сигнала,
-                    // так-как это затратная операция - лучше сначала отсечь все нерелевантные станции.
-                    // return true - уровень сигнала рассчитывается и сота попадает в дальнейшую обработку,
-                    // return false - соответственно мы отсекаем соту.
-
-                    var phone = phoneInPlayerHand.get();
-
-                    // Если телефона в руке нет, то соты нам не нужны
-                    // ну так, на всякий случай проверочка
-                    if (phone == null) {
-                        return false;
+                        // Деинициализируем
+                        playerData.deInit();
+                        return;
                     }
 
-                    // Если в параметрах юзера отключены FM Станции - то сразу скипаем их
-                    if (playerData.paramOffRadio.get() && station instanceof FMStation)
-                        return false;
+                    // Получаем предмет в руке игрока
+                    var item = player.getInventory().getItemInMainHand();
+                    if (!item.equals(itemInPlayerHand.get())) {
 
-                    if (station instanceof MobileBaseStation mobileBaseStation) {
+                        itemInPlayerHand.set(item);
 
-                        // Если в параметрах юзера отключены мобильные сети - то скипаем их
-                        if (playerData.paramOffMobile.get()) {
-                            return false;
-                        }
+                        // Если игрок взял другой предмет - то парсим этот предмет на наличие метатегов телефона, и ложим в Atomic переменную.
+                        phoneInPlayerHand.set(phoneDb.getPhoneData(getPlugin(), item.getItemMeta()));
 
-                        // Если телефон не поддерживает поколение соты, то зачем ее рассчитывать?
-                        if (Collections.disjoint(phone.supportNetworks, mobileBaseStation.supportGenerations)){
-                            return false;
-                        }
+                    }
 
-                        // Если и сота и телефон поддерживают роуминг - то просчитываем ее дальше
-                        if (phone.allowRoamingPolicy && mobileBaseStation.allowMccRoaming && mobileBaseStation.allowMncRoaming) {
+                    // Если телефона в руке нет
+                    if (phoneInPlayerHand.get() == null) {
+
+                        // Чистим боссбары
+                        playerData.bossBarsTempData.entrySet().removeIf(entry -> {
+                            entry.getValue().removePlayer(player);
                             return true;
+                        });
+
+                        // и незачем идти дальше
+                        return;
+                    }
+
+                    // Получаем локацию
+                    var playerLocation = player.getLocation().clone();
+
+                    // Если игрок стоит на месте, то есть координаты одни и те же то скипаем итерацию
+                    if (oldPlayerCords[0] == (int) playerLocation.getX() &&
+                            oldPlayerCords[1] == (int) playerLocation.getY() &&
+                            oldPlayerCords[2] == (int) playerLocation.getZ()) return;
+
+                    // Иначе записываем новые корды
+                    oldPlayerCords[0] = (int) playerLocation.getX();
+                    oldPlayerCords[1] = (int) playerLocation.getY();
+                    oldPlayerCords[2] = (int) playerLocation.getZ();
+
+                    // Получаем локацию игрока
+                    var playerLocationOfHead = playerLocation.clone();
+
+                    // Считаем уровень сигнала от головы игрока
+                    playerLocationOfHead.setY(playerLocation.getY() + 1);
+
+                    // Mobile station  _____________________________________
+                    // Смотрим по параметрам юзера, включены ли сотовые станции
+                    // если да то обрабатываем их
+                    if (!playerData.paramOffMobile.get()) {
+
+                        // Получаем данные сотовой сети телефона
+                        var netwInfo = phoneInPlayerHand.get().getPhoneService(playerLocationOfHead, stationDb);
+
+                        // Получаем боссбар для соты
+                        var sotaBossbar = playerData.bossBarsTempData.get(1L);
+                        if (sotaBossbar == null) {
+
+                            // Если его нет - то создаем новый
+                            sotaBossbar = getServer().createBossBar(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети")
+                                    , BarColor.WHITE, BarStyle.SEGMENTED_6);
+                            sotaBossbar.setProgress(0);
+                            sotaBossbar.addPlayer(player);
+
+                            // Сохраняем боссбар
+                            playerData.bossBarsTempData.put(1L, sotaBossbar);
                         }
 
-                        // Иначе ищем нужный нам mcc и mnc
-                        if (!Collections.disjoint(phone.supportMcc, mobileBaseStation.supportMcc) || !Collections.disjoint(phone.supportMnc, mobileBaseStation.supportMnc)) {
-                            return true;
+                        // Выставляем параметры боссбара для мобильной станции
+                        if (netwInfo.inService.get()) {
+
+                            // Основное
+                            String title = "&7[Phone] " + netwInfo.networkGeneration.get().displayName;
+
+                            // Отметка роуминга (Если есть)
+                            if (netwInfo.inRoaming.get()) {
+                                title += "(R)";
+                            }
+
+                            // Имя оператора
+                            title += "&r - " + netwInfo.currentStation.get().getName();
+
+                            sotaBossbar.setColor(netwInfo.networkGeneration.get().toBarColor());
+                            sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', title));
+                            sotaBossbar.setProgress(netwInfo.signalStrength.get() / 100);
+
+                        } else {
+                            // если сети нет, то нет
+                            sotaBossbar.setColor(BarColor.WHITE);
+                            sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети."));
+                            sotaBossbar.setProgress(0);
+                        }
+                    }
+
+                    // FM _____________________________________
+                    // Смотрим по параметрам юзера, включены ли FM станции
+                    // если да то обрабатываем их
+                    if (playerData.paramOffRadio.get()) {
+
+                        // Получаем состояние FM приемника
+                        var fmInfo = phoneInPlayerHand.get().getFmStation(playerLocationOfHead, stationDb);
+
+                        // Получаем боссбар для FM
+                        var fmBossBar = playerData.bossBarsTempData.get(2L);
+                        if (fmBossBar == null) {
+
+                            // Если его нет - то создаем новый
+                            fmBossBar = getServer().createBossBar(ChatColor.translateAlternateColorCodes('&', "&7[FM] ////")
+                                    , BarColor.BLUE, BarStyle.SOLID);
+                            fmBossBar.setProgress(0);
+                            // fmBossBar.addPlayer(player);
+
+                            // Сохраняем боссбар
+                            playerData.bossBarsTempData.put(2L, fmBossBar);
                         }
 
-                        // Если ничего не подходит, скипаем соту
-                        return false;
+                        // Проверяем включен ли приемник
+                        if (fmInfo.isReceiverOn.get()) {
+                            if (fmBossBar.getPlayers().isEmpty()){
+                                fmBossBar.addPlayer(player);
+                            }
+
+                            // Если да и есть сигнал - то показываем станцию
+                            if (fmInfo.fmStation.get() != null) {
+                                String title = "[FM] " + phoneInPlayerHand.get().currentFmFrequency.get() + "MHz: " + fmInfo.fmStation.get().name;
+                                fmBossBar.setTitle(ChatColor.translateAlternateColorCodes('&', title));
+                                fmBossBar.setProgress(fmInfo.signalStrength.get() / 100);
+
+                            } else { // Если сигнала нет - то выводим заглушку
+                                String title = "[FM] " + phoneInPlayerHand.get().currentFmFrequency.get() + "MHz: ////";
+                                fmBossBar.setTitle(ChatColor.translateAlternateColorCodes('&', title));
+                                fmBossBar.setProgress(0);
+                            }
+
+                        } else if (!fmBossBar.getPlayers().isEmpty()) { // Если приемник выключен а у пользователя все еще есть боссбар
+
+                            // Удаляем его
+                            fmBossBar.removeAll();
+                        }
                     }
 
-                    // Если в параметрах юзера отключены TV Станции - то скипаем
-                    if (playerData.paramOffTv.get() && station instanceof TVStation)
-                        return false;
+                    // Вычисляем время итерации
+                    playerData.lastIterationTime.set((int) (System.currentTimeMillis() - startTime));
 
-                    // Если в параметрах юзера отключены Wi-Fi сети - то скипаем
-                    if (playerData.paramOffWifi.get() && station instanceof WifiStation)
-                        return false;
-
-                    // Если ни один триггер не сработал то.. ну.. пускаем дальше, а что еще делать
-                    return true;
-                });
-
-
-//                List<Long> changedBossBars = new ArrayList<>();
-
-                // Вот тут уже пост-обработка,
-                for (StationDb.NearStationResult stationResult: stations_list) {
-                    // после того как был рассчитан уровень сигнала каждой станции,
-                    // то есть тут уже известны уровни сигналов каждой итерируемой соты.
-
-//                    System.out.println(stationResult.station.stationSerialize());
-//                    System.out.println(phoneInPlayerHand.get().serialize());
-//                    System.out.println("------------");
-
-                    // Mobile Base Station
-                    if (stationResult.station instanceof MobileBaseStation mobileBaseStation) {
-                        // Передаем станцию в обработку
-                        playerData.tempAcceptNetStation(mobileBaseStation, stationResult.signalPrecent, phoneInPlayerHand.get());
-                    }
-
-//                    // FM Station
-//                    if (stationResult.station instanceof FMStation fmStation) {
-//                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(stationResult.station.id);
-//
-//                        changedBossBars.add(stationResult.station.id);
-//
-//                        // Если боссбара в кеше нету, создаем новый
-//                        if (bossBarFromCache == null) {
-//                            bossBarOfStation = getServer().createBossBar( fmStation.name + " (" + fmStation.frequency + "MHz)", BarColor.BLUE, BarStyle.SOLID);
-//                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
-//
-//                            bossBarOfStation.setProgress(0);
-//                            bossBarOfStation.addPlayer(player);
-//                        } else {
-//                            bossBarOfStation = bossBarFromCache;
-//                        }
-//                    }
-//
-//                    // Mobile Base Station
-//                    if (stationResult.station instanceof MobileBaseStation mobileBaseStation) {
-//                        BossBar bossBarFromCache = playerData.bossBarsTempData.get(1L);
-//
-//                        // Скипаем если вес generation меньше чем у предыдущей соты,
-//                        // нам не нужно подключатся к более нисшевой (условно 2G) соте если есть более современная (условно 3G)
-//                        if (mobileBaseStation.generation.networkGeneration <= lastNetworkGenerationWeight) {
-//                            continue;
-//                        }
-//
-//
-//                        if (Collections.disjoint(phoneInPlayerHand.get().supportMcc, mobileBaseStation.supportMcc)
-//                            || Collections.disjoint(phoneInPlayerHand.get().supportMnc, mobileBaseStation.supportMnc)) {
-//                            lastNetworkIsRoaming = true;
-//                        }
-//
-//                        // Устанавливаем вес
-//                        lastNetworkGenerationWeight = mobileBaseStation.generation.networkGeneration;
-//
-//                        changedBossBars.add(1L);
-//
-//                        // Если боссбара в кеше нету, создаем новый
-//                        if (bossBarFromCache == null) {
-//
-//                            bossBarOfStation = getServer().createBossBar(
-//                                    mobileBaseStation.name+" ("+mobileBaseStation.generation.displayName+")", // OperatorName (Generation)
-//                                    mobileBaseStation.generation.toBarColor(), BarStyle.SEGMENTED_6);
-//
-//                            playerData.bossBarsTempData.put(stationResult.station.id, bossBarOfStation);
-//
-//                            bossBarOfStation.setProgress(0);
-//                            bossBarOfStation.addPlayer(player);
-//                        } else {
-//                            bossBarOfStation = bossBarFromCache;
-//                        }
-//                    }
-//                    // Получаем боссбар по ID шнику соты из кеша
-//                    BossBar bossBarOfStation = playerData.bossBarsTempData.get(stationResult.station.id);
-//
-//                    // Если по каким-то причинам боссбар все еще null - то ну.. хз, continue
-//                    if (bossBarOfStation == null) {
-//                        continue;
-//                    }
-//
-//                    // Указываем что такой-то боссбар с таким IDником еще используется и его выгружать не надо
-//                    changedBossBars.add(stationResult.station.id);
-//
-//                    // Дополнительные проверочки
-//                    if (stationResult.signalPrecent > 100){
-//                        stationResult.signalPrecent = 100;
-//                    } else if (stationResult.signalPrecent <= 0){
-//                        continue;
-//                    }
-//
-//                    // Ставим прогресс, боссбар требует от 0.0 до 1.0, поэтому делим проценты на 100.
-//                    bossBarOfStation.setProgress(stationResult.signalPrecent / 100.0);
+                } finally {
+                    // 'Разблокируем' выполнение следующей задачи
+                    isTaskRunning.set(false);
                 }
-
-//                // Чистим лишние боссбары у игрока
-//                playerData.bossBarsTempData.entrySet().removeIf(entry -> {
-//                    if (changedBossBars.contains(entry.getKey())) {
-//                        return false;
-//                    }
-//
-//                    entry.getValue().removePlayer(player);
-//                    return true;
-//                });
-
-                // Применяем сотовую станцию
-                playerData.pushNetStation();
-
-                // Дальше мы применяем боссбар для телефона:
-
-                // Получаем боссбар для соты
-                var sotaBossbar = playerData.bossBarsTempData.get(1L);
-                if (sotaBossbar == null) {
-
-                    // Если его нет - то создаем новый
-                    sotaBossbar = getServer().createBossBar(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети")
-                            , BarColor.WHITE, BarStyle.SEGMENTED_6);
-                    sotaBossbar.setProgress(0);
-                    sotaBossbar.addPlayer(player);
-
-                    // Сохраняем боссбар
-                    playerData.bossBarsTempData.put(1L, sotaBossbar);
-                }
-
-                // Выставляем параметры боссбара для мобильной станции
-                if (!playerData.networkInfo.noService.get()) {
-
-                    // Основное
-                    String title = "&7[Phone] " + playerData.networkInfo.networkGeneration.get().displayName;
-
-                    // Отметка роуминга (Если есть)
-                    if (playerData.networkInfo.inRoaming.get()) {
-                        title += "(R)";
-                    }
-
-                    // Имя оператора
-                    title += "&r - " + playerData.networkInfo.currentStation.get().getName();
-
-                    sotaBossbar.setColor(playerData.networkInfo.networkGeneration.get().toBarColor());
-                    sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', title));
-                    sotaBossbar.setProgress(playerData.networkInfo.signalStrength.get() / 100);
-
-                } else {
-                    // если сети нет, то нет
-                    sotaBossbar.setColor(BarColor.WHITE);
-                    sotaBossbar.setTitle(ChatColor.translateAlternateColorCodes('&', "&7[Phone] Нет сети."));
-                    sotaBossbar.setProgress(0);
-                }
-
-                // Вычисляем время итерации
-                playerData.lastIterationTime.set((int) (System.currentTimeMillis() - startTime));
             }
         };
 
-        // Запускаем каждые 20 тиков
-        br.runTaskTimerAsynchronously(getPlugin(), 20L, 20L);
+        // Запускаем каждые 10 тиков
+        br.runTaskTimerAsynchronously(getPlugin(), 5L, 5L);
     }
+
     public Plugin getPlugin() {
         return this;
     }
-
-//    @EventHandler
-//    public void onPlayerQuit(PlayerQuitEvent evt) {
-//
-//    }
 
 }
